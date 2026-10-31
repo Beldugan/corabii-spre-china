@@ -4,8 +4,9 @@ import { drawShipTop, drawSea, drawWake, drawCompass } from './topship.js';
 import { flagSVG, FLAG_LETTERS } from './flags.js';
 import { getStars, addStars, getFlag, setFlag } from './progress.js';
 
-const DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SV', 'V', 'NV'];
-const DIRN = { N: 'nord', NE: 'nord-est', E: 'est', SE: 'sud-est', S: 'sud', SV: 'sud-vest', V: 'vest', NV: 'nord-vest' };
+const DIRS = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']; // chei interne
+const DIRC = { n: 'N', ne: 'NE', e: 'E', se: 'SE', s: 'S', sw: 'SV', w: 'V', nw: 'NV' }; // prescurtarea afișată (RO: V = vest)
+const DIRN = { n: 'nord', ne: 'nord-est', e: 'est', se: 'sud-est', s: 'sud', sw: 'sud-vest', w: 'vest', nw: 'nord-vest' };
 const dirName = b => DIRS[Math.round(norm360(b) / 45) % 8];
 
 export const LEVELS = [
@@ -119,7 +120,7 @@ export function initGame(root) {
       lv.islands = [poly(1050, 1100, 170, 14, 5), poly(2150, 1600, 150, 12, 2), poly(400, 300, 130, 12, 7)];
       lv.rocks = [{ x: 1900, y: 900, r: 26 }, { x: 900, y: 450, r: 22 }, { x: 1300, y: 1950, r: 25 }];
       lv.intro = '🌫️ <b>Ceață deasă!</b> Vezi doar în jurul corăbiei. Citește pe busolă <b>în ce direcție</b> e geamandura următoare (punctul verde) și îndreaptă prova într-acolo.';
-      lv.goal = () => { const b = lv.items[lv.next]; if (!b) return 'Gata!'; const br = bearing(lv.boat, b); return `Geamandura ${b.n}: spre <b>${DIRN[dirName(br)]}</b> (${dirName(br)}, ${Math.round(br)}°), la ${Math.round(dist(lv.boat, b) / 10) * 10} m`; };
+      lv.goal = () => { const b = lv.items[lv.next]; if (!b) return 'Gata!'; const br = bearing(lv.boat, b); return `Geamandura ${b.n}: spre <b>${DIRN[dirName(br)]}</b> (${DIRC[dirName(br)]}, ${Math.round(br)}°), la ${Math.round(dist(lv.boat, b) / 10) * 10} m`; };
       lv.target = () => lv.items[lv.next];
       lv.stars = () => lv.t < 200 ? 3 : lv.t < 300 ? 2 : 1;
       return lv;

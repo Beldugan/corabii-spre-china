@@ -1,3 +1,4 @@
+/* global __EN */
 // Secțiunea 1: cum se conduce o corabie mare (cursuri față de vânt, vergi, virare, lochul).
 import { D2R, angDiff, offWind, polar, optimalBrace, trimEff, pointOfSail, clamp, lerp, norm360 } from './sailing.js';
 import { drawShipTop, drawSea, drawWake } from './topship.js';
@@ -171,8 +172,8 @@ function initTack(root) {
     let cur = 0; S.forEach((st, i) => { if (T >= st.at) cur = i; });
     [...list.children].forEach((li, i) => { li.classList.toggle('now', i === cur); li.classList.toggle('done', i < cur); });
     g.fillStyle = 'rgba(15,23,42,.72)'; g.fillRect(W - 360, H - 64, 346, 50);
-    g.fillStyle = '#fde68a'; g.font = '700 17px Georgia'; g.textAlign = 'center'; g.fillText(S[cur].ro, W - 187, H - 42);
-    g.fillStyle = '#fff'; g.font = 'italic 14px Georgia'; g.fillText(S[cur].en, W - 187, H - 22);
+    g.fillStyle = '#fde68a'; g.font = '700 17px Georgia'; g.textAlign = 'center'; g.fillText(__EN ? S[cur].en : S[cur].ro, W - 187, H - 42); // în engleză comanda engleză e cea mare
+    g.fillStyle = '#fff'; g.font = 'italic 14px Georgia'; g.fillText(__EN ? S[cur].ro : S[cur].en, W - 187, H - 22);
   }
   requestAnimationFrame(loop);
 }

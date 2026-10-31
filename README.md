@@ -2,6 +2,8 @@
 
 Aplicație interactivă pentru Eva (8 ani, sistemul britanic, Year 4): **marele drum al corăbiilor cu pânze din Anglia până în China**. Merge pe calculator, tabletă și telefon. Nu are nevoie de internet: dublu-click pe `index.html`.
 
+🌐 **Română / English**: butoanele **RO | EN** din antet schimbă limba întregii aplicații (texte, hărți, desene, jocuri, quiz-uri, denumirile din 3D); alegerea se ține minte. Link direct în engleză: `?lang=en` (ex. https://beldugan.github.io/corabii-spre-china/?lang=en). Comenzile marinărești rămân bilingve în ambele limbi.
+
 Pagina live: https://beldugan.github.io/corabii-spre-china/
 
 ## Cele opt secțiuni
@@ -29,9 +31,18 @@ src/                     – sursele (Three.js, d3-geo, topojson)
   maneuver.js sailing.js topship.js – manevrele și fizica velierului
   map.js geo.js voyage.js   – harta, vânturile, curenții, simularea
   history.js game.js flags.js problem.js progress.js main.js
+  forces.js                 – forțele pe corabie
+  i18n.js                   – comutatorul RO | EN și traducerea textului fix din index.html
+  lang/en.json              – traducerile textelor din cod (cheia = textul românesc exact)
+  lang/en-html.json         – traducerile textului fix din pagină
+tools/build.mjs          – build-ul (esbuild + înlocuirea textelor RO/EN)
 build.sh                 – reface assets/js/app.js
 ```
 
-Pentru a reface fișierul `app.js` după o modificare în `src/`: `npm i three@0.160.0 d3-geo@3.1.0 topojson-client@3.1.0 esbuild@0.20.2`, apoi `sh build.sh`.
+Pentru a reface fișierul `app.js` după o modificare în `src/`: `npm i three@0.160.0 d3-geo@3.1.0 topojson-client@3.1.0 esbuild@0.20.2 acorn@8.11.3 acorn-walk@8.3.2`, apoi `sh build.sh`.
+
+**Despre traduceri.** La build, fiecare text românesc din cod care apare în `src/lang/en.json` primește varianta engleză. Dacă modifici un text în română, actualizează și cheia lui din `en.json` (altfel, în modul EN apare textul românesc). Build-ul afișează câte texte a tradus.
+
+**Tachelajul 3D (parâmele).** Numărul wanturilor e cel istoric aproximativ (Hindostan 9/9/6 pe fiecare parte, Cutty Sark 5/5/4, Madre de Deus 6/9/4/3), cu treptele (ratlines) la cca 38 cm, wanturi de gabier cu trepte și wanturi de sub gabie (futtock), wanturi de zburător, pataraine, sub-bompres, mantile până la capul catargului, brațe conduse ca în realitate, scote și mure la pânzele mari. Manevrele fixe sunt gudronate (închise la culoare), cele curente din cânepă deschisă.
 
 Datele uscatului: Natural Earth / world-atlas (domeniu public). Modelele 3D sunt reconstituiri după desene și descrieri istorice; cifrele sunt aproximative.

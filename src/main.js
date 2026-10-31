@@ -1,4 +1,5 @@
 // Pornirea aplicației: taburi, temă, inițializarea secțiunilor la prima deschidere.
+import './i18n.js';
 import { ShipViewer } from './ships3d.js';
 import { SHIP_INFO, PARTS } from './shipdata.js';
 import { initManeuver } from './maneuver.js';

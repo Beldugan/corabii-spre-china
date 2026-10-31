@@ -191,7 +191,10 @@ const M = {
   darkWood: () => mat('dwood', () => new THREE.MeshStandardMaterial({ color: 0x3a2716, roughness: 0.85 })),
   mast: (c = 0xa57a48) => mat('mast' + c, () => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 })),
   black: () => mat('black', () => new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.6 })),
+  // manevre fixe (wanturi, straiuri, pataraine): parâme gudronate, aproape negre
   rope: () => mat('rope', () => new THREE.LineBasicMaterial({ color: 0x2b2118, transparent: true, opacity: 0.85 })),
+  // manevre curente (brațe, mantile, scote, mure): cânepă negudronată, deschisă la culoare
+  runRope: () => mat('runRope', () => new THREE.LineBasicMaterial({ color: 0x9a8058, transparent: true, opacity: 0.9 })),
   sail: (kind) => mat('sail' + kind, () => new THREE.MeshStandardMaterial({ map: sailTex(kind), side: THREE.DoubleSide, roughness: 0.95 })),
   furled: () => mat('furl', () => new THREE.MeshStandardMaterial({ color: 0xe0d5bb, roughness: 1 })),
   deck: () => mat('deck', () => new THREE.MeshStandardMaterial({ map: deckTex(), roughness: 0.9, side: THREE.DoubleSide })),
@@ -383,6 +386,9 @@ export function buildShip(id) {
   const anchors = {};
   const sails = [], furled = [], flags = [], lines = [];
   const seg = (a, b) => { lines.push(a.x, a.y, a.z, b.x, b.y, b.z); };
+  const runLines = [], sheetLines = [];
+  const segR = (a, b) => { runLines.push(a.x, a.y, a.z, b.x, b.y, b.z); };
+  const segS = (a, b) => { sheetLines.push(a.x, a.y, a.z, b.x, b.y, b.z); };
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
   // suprastructuri (castele, dunete, cabine)
@@ -478,10 +484,11 @@ export function buildShip(id) {
       const yc = cyl(yr * 0.5, yr, yd.w / 2, M.mast(S.yardColor || S.mastColor), 6);
       yc.rotation.x = PI / 2; yc.position.z = yd.w / 4; yg.add(yc);
       const yc2 = yc.clone(); yc2.rotation.x = -PI / 2; yc2.position.z = -yd.w / 4; yg.add(yc2);
-      // mantilele (lifts): de la capetele vergii la catarg
-      const above = Math.min(mastTop, yd.h + 3.5) - yd.h;
-      const lg = new THREE.BufferGeometry().setFromPoints([V(0, above, 0), V(0, 0, yd.w / 2 - 0.3), V(0, above, 0), V(0, 0, -yd.w / 2 + 0.3)]);
-      yg.add(new THREE.LineSegments(lg, M.rope()));
+      // mantilele (lifts): de la capul (cap) bucății de catarg de deasupra vergii până la capetele vergii
+      const capH = heads.find(hh => hh > yd.h + 1.2) ?? mastTop;
+      const above = Math.max(1.5, capH - 0.5 - yd.h);
+      const lg = new THREE.BufferGeometry().setFromPoints([V(-0.3, above, 0.25), V(0, 0, yd.w / 2 - 0.3), V(-0.3, above, -0.25), V(0, 0, -yd.w / 2 + 0.3)]);
+      yg.add(new THREE.LineSegments(lg, M.runRope()));
       if (yd.sail !== false) {
         let foot, wBot;
         if (k === 0) { foot = yd.foot ?? 4; wBot = yd.w * (yd.footW ?? 1.0); }
@@ -491,6 +498,14 @@ export function buildShip(id) {
         s.position.y = -0.25; yg.add(s); sails.push(s);
         const f = cyl(0.35, 0.35, yd.w * 0.85, M.furled(), 8); f.rotation.x = PI / 2; f.position.y = -0.35; f.visible = false; yg.add(f); furled.push(f);
         s.userData.sq = k; s.userData.furl = f;
+        // scotele (sheets) spre pupa și murele (tacks) spre provă, la colțurile de jos ale pânzei mari
+        if (k === 0 && !yd.cross) for (const sd of [-1, 1]) {
+          const clew = toShip(yd.h - 0.25 - h, sd * wBot / 2, 0.7);
+          const t0 = (clew.x - tx(0)) / L;
+          const aftT = clamp(t0 - 0.12, 0.03, 0.97), fwdT = clamp(t0 + 0.11, 0.03, 0.96);
+          segS(clew, V(tx(aftT), deckH(aftT) + 0.5, sd * (halfDeck(aftT) + 0.1)));
+          segS(clew, V(tx(fwdT), deckH(fwdT) + 0.5, sd * (halfDeck(fwdT) + 0.1)));
+        }
         if (mi === S.mainIndex && k === 0) { anchors.verga = toShip(yd.h + 0.4, yd.w / 2 - 0.5); }
         if (mi === S.mainIndex && k === 1) { anchors.panza = toShip(yd.h - h * 0.5, 0, 1.0); }
       }
@@ -506,36 +521,56 @@ export function buildShip(id) {
         }
       }
       yg.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(fr), M.rope()));
-      yardInfo.push({ mi, h: yd.h, w: yd.w, toShip: (y, z) => toShip(y, z, 0.7) });
+      yardInfo.push({ mi, k, h: yd.h, w: yd.w, toShip: (y, z) => toShip(y, z, 0.7) });
     });
 
     // wanturile (shrouds) cu treptele lor (ratlines)
     const chainY = deckH(mDef.t) - 0.2, chainZ = halfDeck(mDef.t) + 0.35;
-    for (const s of ((mDef.shrouds ?? 5) >= 2 ? [-1, 1] : [])) {
+    const n = mDef.shrouds || 5;
+    for (const s of (n >= 2 ? [-1, 1] : [])) {
       const top = toShip(heads[0] - 2.4, s * 0.5);
       const feet = [];
-      const n = mDef.shrouds || 5;
       for (let i = 0; i < n; i++) {
-        const fx = mx - 2.6 + i * (3.2 / (n - 1));
-        const foot = V(fx, chainY, s * chainZ);
+        const foot = V(shroudX(mx, mDef, i, n), chainY, s * chainZ);
         seg(top, foot); feet.push(foot);
       }
-      // trepte
-      const steps = Math.floor((heads[0] - 2.4 - (chainY - baseY)) / 0.9);
-      for (let r = 1; r < steps; r++) {
-        const f = r / steps;
-        for (let i = 0; i < n - 1; i++) seg(feet[i].clone().lerp(top, f), feet[i + 1].clone().lerp(top, f));
+      // treptele (ratlines): la cca 38 cm una de alta, ca pașii unei scări; legate de toate wanturile în afară
+      // de cel mai din spate, iar fiecare a cincea treaptă ajunge și la el. Încep puțin deasupra ochilor de lemn.
+      const lenS = top.distanceTo(feet[0]);
+      const f0 = 0.9 / lenS, f1 = 1 - 2.2 / lenS;
+      const steps = Math.floor((f1 - f0) * lenS / 0.38);
+      for (let r = 0; r <= steps; r++) {
+        const f = f0 + (f1 - f0) * r / steps;
+        for (let i = r % 5 === 0 ? 0 : 1; i < n - 1; i++) seg(feet[i].clone().lerp(top, f), feet[i + 1].clone().lerp(top, f));
       }
-      if (mi === S.mainIndex && s === 1) anchors.wanturi = feet[2].clone().lerp(top, 0.45);
+      if (mi === S.mainIndex && s === 1) anchors.wanturi = feet[Math.min(2, n - 1)].clone().lerp(top, 0.45);
       if (mi === S.mainIndex) { rig.top[s] = top.clone(); rig.feet[s] = feet.map(f => f.clone()); rig.mx = mx; rig.chainY = chainY; rig.chainZ = chainZ; }
-      // wanturile gabierului (de la catargul 2 la marginea gabiei)
+      // wanturile gabierului: de la catargul 2 la marginea gabiei, cu treptele lor;
+      // de sub gabie, „wanturile de sub gabie” (futtock shrouds) duc forța mai departe în wanturile mari
       if (heads.length > 1) {
         const t2 = toShip(heads[1] - 1.6, s * 0.3);
-        const rad = mDef.topR || 2.2;
-        for (let i = 0; i < 3; i++) seg(t2, toShip(heads[0] - 1.2, s * rad * 0.95, -0.8 + i * 0.8));
+        const rad = mDef.topR || 2.2, nt = mDef.topShrouds || 3;
+        const rim = [];
+        for (let i = 0; i < nt; i++) {
+          const xo = nt > 1 ? -1.3 + i * (1.9 / (nt - 1)) : -0.4;
+          const p = toShip(heads[0] - 1.2, s * rad * 0.95, xo); rim.push(p); seg(t2, p);
+          // futtock: de la marginea gabiei în jos și spre interior, până la wanturile mari (cca 2,6 m sub gabie)
+          const fi = Math.round(1 + i * (n - 2) / Math.max(1, nt - 1));
+          seg(p, top.clone().lerp(feet[Math.min(n - 1, fi)], 2.6 / lenS));
+        }
+        const lenT = t2.distanceTo(rim[0]), stepsT = Math.floor((lenT - 2.2) / 0.38);
+        for (let r = 1; r <= stepsT; r++) {
+          const f = 0.4 / lenT + r * 0.38 / lenT;
+          for (let i = 0; i < nt - 1; i++) seg(rim[i].clone().lerp(t2, f), rim[i + 1].clone().lerp(t2, f));
+        }
+        // wanturile zburătorului (topgallant shrouds): de la catargul 3 la capetele crucetelor
+        if (heads.length > 2) {
+          const t3 = toShip(heads[2] - 1.0, s * 0.2);
+          for (const xo of [-0.5, 0.4]) seg(t3, toShip(heads[1] - 1.0, s * rad * 0.55 * 0.95, xo - 0.3));
+        }
       }
-      // pataraine (backstays) spre bordaj, la pupa catargului
-      for (let h = 1; h < heads.length; h++) seg(toShip(heads[h] - 0.6, 0), V(mx - 4 - h * 1.5, chainY, s * chainZ));
+      // pataraine (backstays) spre podina din spatele wanturilor
+      for (let h = 1; h < heads.length; h++) seg(toShip(heads[h] - 0.6, s * 0.2), V(shroudX(mx, mDef, 0, n) - 0.8 - h * 1.1, chainY, s * (chainZ + 0.1)));
     }
   });
 
@@ -556,6 +591,10 @@ export function buildShip(id) {
     const fm = mastTops[0];
     seg(fm.toShip(fm.heads[0] - 2.2), base.clone().addScaledVector(dir, len * 0.35));
     if (bowsprit.martingale) seg(bowTip, V(tx(1) - 0.5, deckH(1) - 3.5, 0));
+    // sub-bompresul (bobstay): ține bompresul în jos, spre etrava de lângă apă; wanturile bompresului îl țin lateral
+    const bobAt = base.clone().addScaledVector(dir, len * 0.42);
+    seg(bobAt, V(tx(0.995) - 0.3, 0.6, 0));
+    for (const sd of [-1, 1]) seg(base.clone().addScaledVector(dir, len * 0.32), V(tx(0.93), deckH(0.93) - 1.6, sd * (halfDeck(0.93) + 0.15)));
     // pânza de sub bompres (civadiera, la corăbiile vechi)
     if (bowsprit.sprit) {
       const p = base.clone().addScaledVector(dir, len * bowsprit.sprit.at);
@@ -638,8 +677,10 @@ export function buildShip(id) {
       const bc = cyl(0.07, 0.07, p1.distanceTo(p2) * 0.92, M.darkWood(), 4);
       bc.position.copy(p1).lerp(p2, 0.5); bc.position.z += 0.25; bc.quaternion.setFromUnitVectors(V(0, 1, 0), p2.clone().sub(p1).normalize());
       ship.add(bc); sails.push(bc);
-      if (i % 3 === 0) seg(p2.clone().add(V(0, 0, 0.3)), V(p2.x - 3, deckH(Math.max(0, (p2.x / L) + 0.45)) - bw + 0.5, 0)); // scotele (sheets)
+      if (i % 3 === 0) segR(p2.clone().add(V(0, 0, 0.3)), V(p2.x - 3, deckH(Math.max(0, (p2.x / L) + 0.45)) - bw + 0.5, 0)); // scotele (sheets)
     }
+    // driză (halyard): ridică vergă de sus a pânzei, din vârful catargului
+    segR(m.toShip(m.heads[m.heads.length - 1] - 0.4, 0.4), B.clone().lerp(C, 0.25).add(V(0, 0, -0.2)));
     if (!anchors.sipci) anchors.sipci = A.clone().lerp(C, 0.5).add(V(0, 0, 1));
   }
 
@@ -737,12 +778,16 @@ export function buildShip(id) {
     const t = mDef.t, y = deckH(t) - 0.55;
     for (const sd of [-1, 1]) {
       const z = zAt(t, y);
-      const ch = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.22, 0.75), M.darkWood());
-      ch.position.set(tx(t) - 1.0, y, sd * (z + 0.3)); ship.add(ch);
-      const n = mDef.shrouds || 5;
-      for (let i = 0; i < n; i++) {
-        const de = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.12, 10), M.black());
-        de.rotation.x = PI / 2; de.position.set(tx(t) - 2.6 + i * (3.2 / (n - 1)), deckH(t) + 0.15, sd * (halfDeck(t) + 0.38)); ship.add(de);
+      const n = mDef.shrouds || 5, span = shroudSpan(mDef, n);
+      const ch = new THREE.Mesh(new THREE.BoxGeometry(span + 1.8, 0.22, 0.75), M.darkWood());
+      ch.position.set(tx(t) + 0.6 - span / 2, y, sd * (z + 0.3)); ship.add(ch);
+      const der = Math.min(0.2, span / (n - 1) * 0.42);
+      for (let i = 0; i < n + 2; i++) {
+        // ultimii doi ochi, mai mici, sunt pentru pataraine
+        const isBack = i >= n;
+        const de = new THREE.Mesh(new THREE.CylinderGeometry(isBack ? der * 0.8 : der, isBack ? der * 0.8 : der, 0.12, 10), M.black());
+        const xx = isBack ? shroudX(tx(t), mDef, 0, n) - 0.8 - (i - n + 1) * 1.1 : shroudX(tx(t), mDef, i, n);
+        de.rotation.x = PI / 2; de.position.set(xx, deckH(t) + 0.15, sd * (halfDeck(t) + 0.38)); ship.add(de);
         seg(de.position.clone(), V(de.position.x, y - 1.1, sd * (zAt(t, y - 1.1) + 0.05))); // lanțurile
       }
     }
@@ -819,13 +864,20 @@ export function buildShip(id) {
     ln.position.set(tx(t) - 0.4, top, z); ship.add(ln);
     const post = cyl(0.06, 0.06, DT.lanternY || 1.2, M.gold(), 4); post.position.set(tx(t) - 0.4, top - (DT.lanternY || 1.2) / 2 - 0.4, z); ship.add(post);
   }
-  // brațele vergilor (braces): frânghii trase spre pupa
+  // brațele vergilor (braces), manevre curente:
+  // · vergile de jos (pânza mare) ale arborelui mare și ale trinchetului: spre pupa, la parapet (cel mare pe „sfertul” din spate);
+  // · vergile de sus: spre pupa, la catargul următor, cam la înălțimea gabiei / capului lui;
+  // · vergile artimonului (ultimul catarg): înainte, la arborele mare.
   for (const y of yardInfo) {
-    const aft = mastTops[y.mi + 1];
+    const aft = mastTops[y.mi + 1], fwd = mastTops[y.mi - 1];
     for (const sd of [-1, 1]) {
       const arm = y.toShip(y.h, sd * (y.w / 2 - 0.2));
-      const to = aft ? aft.toShip(Math.max(3, y.h * 0.55), sd * 0.4) : V(tx(0.03), deckH(0.03) + 0.2, sd * halfDeck(0.03));
-      seg(arm, to);
+      let to;
+      if (!aft && fwd) to = fwd.toShip(clamp(y.h * 0.7, 3, fwd.heads[0] - 2), sd * 0.6);
+      else if (!aft) to = V(tx(0.03), deckH(0.03) + 0.2, sd * halfDeck(0.03));
+      else if (y.k === 0) { const tt = y.mi + 1 === mastTops.length - 1 ? 0.1 : S.masts[y.mi + 1].t; to = V(tx(tt), deckH(tt) + 0.6, sd * (halfDeck(tt) + 0.05)); }
+      else to = aft.toShip(clamp(aft.heads[Math.min(y.k - 1, aft.heads.length - 1)] - 1.5, 3, 999), sd * 0.4);
+      segR(arm, to);
     }
   }
   // echipajul: marinari pe punte și pe vergi
@@ -855,6 +907,8 @@ export function buildShip(id) {
   }
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
   ship.add(new THREE.LineSegments(lg, M.rope()));
+  if (runLines.length) { const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(runLines, 3)); ship.add(new THREE.LineSegments(rg, M.runRope())); }
+  if (sheetLines.length) { const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sheetLines, 3)); const so = new THREE.LineSegments(sg, M.runRope()); so.userData.sq = 0; ship.add(so); sails.push(so); }
 
   ship.userData = { id, sails, furled, flags, anchors, length: L + (bowsprit ? bowsprit.len * Math.cos(bowsprit.angle * PI / 180) : 0), hull: S.hull, height: Math.max(...mastTops.map(m => m.baseY + m.heads[m.heads.length - 1])) };
   ship.userData.inside = inside;
@@ -872,6 +926,9 @@ export function buildShip(id) {
 }
 
 
+// poziția (x) a piciorului wantului i din n: cel mai din față e puțin înaintea catargului, restul spre pupa
+function shroudSpan(mDef, n) { return mDef.span || Math.min(3.2 + (n - 5) * 0.75, 7.5); }
+function shroudX(mx, mDef, i, n) { const sp = shroudSpan(mDef, n); return mx + 0.6 - sp + i * (sp / (n - 1)); }
 function blockLift(S, t) { let h = 0; for (const b of (S.blocks || [])) if (t >= b.t0 && t <= b.t1 && !b.over) h = Math.max(h, (b.lift || 0) + b.h); return h; }
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function gratingTex() {
@@ -1185,9 +1242,9 @@ export const SPECS = {
     },
     mastColor: 0xb08a55, yardColor: 0x1c1c1c, mainIndex: 1,
     masts: [
-      { t: 0.735, rake: 3, r: 0.42, segs: [19, 14, 13], topR: 2.0, yards: [{ h: 16.5, w: 22.5, foot: 4 }, { h: 21.5, w: 20 }, { h: 26.5, w: 17.5 }, { h: 31.5, w: 14 }, { h: 36, w: 10.5 }] },
-      { t: 0.5, rake: 3.5, r: 0.45, segs: [20, 15, 14], topR: 2.1, yards: [{ h: 17.5, w: 23.8, foot: 4 }, { h: 22.5, w: 21.2 }, { h: 28, w: 18.5 }, { h: 33.5, w: 15 }, { h: 38.5, w: 11 }] },
-      { t: 0.27, rake: 4, r: 0.36, segs: [16, 12, 10], topR: 1.6, yards: [{ h: 14, w: 17, sail: false }, { h: 18.5, w: 15 }, { h: 23, w: 13 }, { h: 27.5, w: 10 }, { h: 31, w: 7.5 }] },
+      { t: 0.735, rake: 3, r: 0.42, segs: [19, 14, 13], topR: 2.0, shrouds: 5, span: 4.2, topShrouds: 4, yards: [{ h: 16.5, w: 22.5, foot: 4 }, { h: 21.5, w: 20 }, { h: 26.5, w: 17.5 }, { h: 31.5, w: 14 }, { h: 36, w: 10.5 }] },
+      { t: 0.5, rake: 3.5, r: 0.45, segs: [20, 15, 14], topR: 2.1, shrouds: 5, span: 4.5, topShrouds: 4, yards: [{ h: 17.5, w: 23.8, foot: 4 }, { h: 22.5, w: 21.2 }, { h: 28, w: 18.5 }, { h: 33.5, w: 15 }, { h: 38.5, w: 11 }] },
+      { t: 0.27, rake: 4, r: 0.36, segs: [16, 12, 10], topR: 1.6, shrouds: 4, span: 3.4, topShrouds: 3, yards: [{ h: 14, w: 17, sail: false }, { h: 18.5, w: 15 }, { h: 23, w: 13 }, { h: 27.5, w: 10 }, { h: 31, w: 7.5 }] },
     ],
     bowsprit: { angle: 11, len: 20, r: 0.42, inboard: 3.5, drop: 0.7, martingale: true },
     jibs: [{ at: 0.3, h: 17.5, clew: 0.45 }, { at: 0.55, h: 24, clew: 0.42 }, { at: 0.78, h: 30, clew: 0.4 }, { at: 0.97, h: 35, clew: 0.38 }],
@@ -1209,9 +1266,9 @@ export const SPECS = {
     },
     mastColor: 0xa47a49, mainIndex: 1, quarterGallery: true,
     masts: [
-      { t: 0.79, rake: 1, r: 0.55, segs: [21, 14, 9], topR: 2.6, yards: [{ h: 18, w: 23, foot: 5.5 }, { h: 27, w: 17.5 }, { h: 34.5, w: 11 }] },
-      { t: 0.535, rake: 2, r: 0.6, segs: [23, 15.5, 10], topR: 2.8, yards: [{ h: 20, w: 26, foot: 6 }, { h: 29.5, w: 19.5 }, { h: 37.5, w: 12.5 }] },
-      { t: 0.25, rake: 3, r: 0.45, segs: [18, 12, 8], topR: 2.1, yards: [{ h: 15.5, w: 18, sail: false }, { h: 22.5, w: 13.5 }, { h: 28.5, w: 8.5 }] },
+      { t: 0.79, rake: 1, r: 0.55, segs: [21, 14, 9], topR: 2.6, shrouds: 9, span: 6.2, topShrouds: 4, yards: [{ h: 18, w: 23, foot: 5.5 }, { h: 27, w: 17.5 }, { h: 34.5, w: 11 }] },
+      { t: 0.535, rake: 2, r: 0.6, segs: [23, 15.5, 10], topR: 2.8, shrouds: 9, span: 6.6, topShrouds: 4, yards: [{ h: 20, w: 26, foot: 6 }, { h: 29.5, w: 19.5 }, { h: 37.5, w: 12.5 }] },
+      { t: 0.25, rake: 3, r: 0.45, segs: [18, 12, 8], topR: 2.1, shrouds: 6, span: 4.2, topShrouds: 3, yards: [{ h: 15.5, w: 18, sail: false }, { h: 22.5, w: 13.5 }, { h: 28.5, w: 8.5 }] },
     ],
     bowsprit: { angle: 27, len: 24, r: 0.55, inboard: 4, drop: 0.8, sprit: { at: 0.55, w: 14, h: 5.5 } },
     jibs: [{ at: 0.55, h: 19, clew: 0.5 }, { at: 0.9, h: 28, clew: 0.42 }],
@@ -1233,10 +1290,10 @@ export const SPECS = {
     },
     mastColor: 0x8b6136, mainIndex: 1, roundTops: true, sailKind: 'old',
     masts: [
-      { t: 0.8, rake: -2, r: 0.55, segs: [19, 11], topR: 2.0, shrouds: 4, yards: [{ h: 16, w: 19, foot: 3.5, cross: true }, { h: 24.5, w: 10.5, cross: false }] },
-      { t: 0.52, rake: 1, r: 0.75, segs: [26, 13, 7], topR: 2.6, yards: [{ h: 22, w: 28, foot: 4, footW: 1.05, cross: true }, { h: 32.5, w: 15, cross: true }, { h: 39, w: 7 }] },
-      { t: 0.27, rake: 2, r: 0.45, segs: [17, 6], topR: 1.6, shrouds: 4 },
-      { t: 0.1, rake: 3, r: 0.38, segs: [13], topR: 1.2, shrouds: 3 },
+      { t: 0.8, rake: -2, r: 0.55, segs: [19, 11], topR: 2.0, shrouds: 6, span: 4.4, topShrouds: 3, yards: [{ h: 16, w: 19, foot: 3.5, cross: true }, { h: 24.5, w: 10.5, cross: false }] },
+      { t: 0.52, rake: 1, r: 0.75, segs: [26, 13, 7], topR: 2.6, shrouds: 9, span: 6.8, topShrouds: 4, yards: [{ h: 22, w: 28, foot: 4, footW: 1.05, cross: true }, { h: 32.5, w: 15, cross: true }, { h: 39, w: 7 }] },
+      { t: 0.27, rake: 2, r: 0.45, segs: [17, 6], topR: 1.6, shrouds: 4, span: 3.0 },
+      { t: 0.1, rake: 3, r: 0.38, segs: [13], topR: 1.2, shrouds: 3, span: 2.2 },
     ],
     lateens: [{ mast: 2, h: 9, rise: 11, fwd: 6, aft: 9, clewY: 3.5 }, { mast: 3, h: 7, rise: 8, fwd: 4, aft: 6.5, clewY: 6 }],
     bowsprit: { angle: 32, len: 19, r: 0.55, inboard: 3, drop: 0.5, sprit: { at: 0.72, w: 12, h: 5 } },

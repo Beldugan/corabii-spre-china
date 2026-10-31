@@ -78,7 +78,7 @@ const PARTS = {
   catarg: { n: 'Catargul', f: 'Compresiune + încovoiere', d: 'E apăsat în jos de wanturi (strâns, „compresiune”) și îndoit de vânt. Catargele mari erau făcute din mai multe bucăți de pin, legate cu cercuri de fier.' },
   wantVant: { n: 'Wanturile din partea vântului', f: 'Întindere: trag tare', d: 'Când vântul împinge catargul, wanturile din partea de unde vine vântul se întind și țin catargul. O frânghie poate doar să tragă, nu să împingă.' },
   wantSub: { n: 'Wanturile de sub vânt', f: 'Aproape slăbite', d: 'Pe partea cealaltă, wanturile se slăbesc. Marinarii le strângeau bine în port, ca să nu se clatine catargul când corabia se legăna.' },
-  ochi: { n: 'Ochii de lemn (deadeyes)', f: 'Întindere', d: 'Două discuri de lemn cu câte 3 găuri. Parâma trecută prin găuri în zig-zag lucrează ca un scripete: cu mâna tragi puțin, iar wantul se întinde tare.' },
+  ochi: { n: 'Ochii de lemn (deadeyes)', f: 'Întindere', d: 'Două discuri de lemn cu câte 3 găuri. Parâma de întindere, trecută prin găuri în zig-zag, lucrează ca un scripete și înmulțește forța. Găurile nu au roți, așa că frecarea mănâncă o parte din ea: marinarii mai prindeau un palanc de capătul parâmei și trăgeau mai mulți deodată.' },
   lant: { n: 'Lanțurile și podina', f: 'Întindere: duc forța în corp', d: 'Wantul se termină cu un lanț de fier prins cu bolțuri în bordaj. Podina (o scândură groasă în afară) depărtează wanturile de catarg, ca triunghiul să fie mai lat și mai puternic.' },
   verga: { n: 'Vergile', f: 'Încovoiere', d: 'Pânza trage de vergă pe toată lungimea ei, ca o greutate pe o bară sprijinită la mijloc.' },
   panza: { n: 'Pânzele', f: 'Întindere în țesătură', d: 'Vântul umflă pânza. Forța crește cu pătratul vitezei vântului: vânt de 2 ori mai tare înseamnă forță de 4 ori mai mare!' },
@@ -294,10 +294,12 @@ function initSection(root) {
       if (pp) { const q = P(pp.x, pp.y, pp.z); const r = 16 + 4 * Math.sin(t * 5); g.save(); g.strokeStyle = '#facc15'; g.lineWidth = 4; g.shadowColor = '#000'; g.shadowBlur = 6; g.beginPath(); g.arc(q[0], q[1], r, 0, Math.PI * 2); g.stroke(); g.restore(); label(g, q[0] + r + 6, q[1] - r, PARTS[st.hi].n, '#fde68a', true); }
     }
     // caseta cu înclinarea
-    g.fillStyle = 'rgba(15,23,42,.78)'; g.fillRect(12, 12, 250, 58);
+    const tHeel = st.capsized ? 'RĂSTURNATĂ!' : `înclinare ${Math.abs(st.theta).toFixed(0)}°`, tWind = `vânt: ${BEAUFORT[st.bf][1]} (${st.bf} Beaufort)`;
+    g.font = '13px "Segoe UI"'; const bw = Math.max(250, g.measureText(tWind).width + 22);
+    g.fillStyle = 'rgba(15,23,42,.78)'; g.fillRect(12, 12, bw, 58);
     g.fillStyle = '#fff'; g.font = '700 22px "Segoe UI"'; g.textAlign = 'left';
-    g.fillText(st.capsized ? 'RĂSTURNATĂ!' : `înclinare ${Math.abs(st.theta).toFixed(0)}°`, 22, 40);
-    g.font = '13px "Segoe UI"'; g.fillText(`vânt: ${BEAUFORT[st.bf][1]} (${st.bf} Beaufort)`, 22, 60);
+    g.fillText(tHeel, 22, 40);
+    g.font = '13px "Segoe UI"'; g.fillText(tWind, 22, 60);
     const portLee = rot([hw(DECKS.gun + 0.9), DECKS.gun + 0.9], th);
     const flooding = portLee[1] < 0 && !st.capsized;
     // valorile
@@ -526,7 +528,7 @@ const BUILD = [
   { t: 'Trecerea prin punți: parteneri și pene', d: 'La fiecare punte, catargul trece printr-o gaură întărită cu un cadru gros (<b>parteneri</b>). Golul se umple cu <b>pene de lemn</b> bătute cu ciocanul.', why: 'Punțile țin catargul drept ca niște mâini care îl strâng în trei locuri. Fără pene, catargul ar „juca” și ar rupe puntea.' },
   { t: 'Un catarg din mai multe bucăți', d: 'Catargul de jos al unei corăbii mari avea aproape 1 m grosime. Nu exista un copac atât de gros și de drept, așa că era făcut din <b>mai multe bucăți de pin</b> lipite, strânse cu <b>cercuri de fier</b> bătute la cald.', why: 'Fierul încălzit se strânge când se răcește și presează bucățile ca un inel pe deget. Pinul e lung, drept, ușor și se îndoaie fără să se rupă.' },
   { t: 'Gabia și gabierul, ținut de un cui', d: 'Deasupra se pune <b>gabia</b> (platforma) și un catarg mai subțire, <b>gabierul</b>. El urcă printr-un <b>capac</b> și stă sprijinit pe un <b>cui gros de fier</b> (<i>fid</i>).', why: 'Pe furtună, gabierul se putea coborî: se scotea cuiul și catargul aluneca în jos. Corabia avea astfel mai puțină greutate sus și se înclina mai puțin.' },
-  { t: 'Wanturile cu ochi de lemn', d: '<b>Wanturile</b> leagă vârful catargului de marginile corăbiei. Jos se termină cu doi <b>ochi de lemn</b> cu câte 3 găuri, prin care trece în zig-zag o <b>parâmă de întindere</b>.', why: 'Parâma trece de 6 ori între ochi, ca un scripete: tragi cu 10 kg și wantul se întinde cu aproape 60 kg. Așa wanturile puteau fi strânse foarte tare cu mâna.' },
+  { t: 'Wanturile cu ochi de lemn', d: '<b>Wanturile</b> leagă vârful catargului de marginile corăbiei. Jos se termină cu doi <b>ochi de lemn</b> cu câte 3 găuri, prin care trece în zig-zag o <b>parâmă de întindere</b>.', why: 'Parâma face 6 drumuri între ochi, ca la un scripete: în teorie forța se înmulțește de 6 ori. Dar găurile nu au roți și parâma se freacă mult, așa că în realitate se câștigă cam de 3 ori. De aceea marinarii prindeau de capătul parâmei un palanc (încă un scripete) și trăgeau mai mulți deodată: așa un want ajungea întins cu câteva tone.' },
   { t: 'Lanțurile și podinele', d: 'Ochiul de jos e prins cu un <b>lanț de fier</b> bătut cu bolțuri în bordaj. O scândură groasă care iese în afară, <b>podina</b>, depărtează wanturile de catarg.', why: 'Cu cât baza triunghiului e mai lată, cu atât wanturile țin catargul cu mai puțină forță. Lanțul duce forța în coastele corăbiei.' },
   { t: 'Straiuri și pataraine: triunghiuri peste tot', d: 'Spre față, catargul e ținut de <b>straiuri</b>, iar spre spate de <b>pataraine</b>. Împreună cu wanturile, formează <b>triunghiuri</b> în toate direcțiile.', why: 'Triunghiul este singura formă care nu se strâmbă când o împingi. Catargul (apăsat) și frânghiile (întinse) fac împreună o structură rigidă.' },
   { t: 'Totul lucrează: vine vântul', d: 'Vântul împinge pânzele. Wanturile din vânt se întind (<span style="color:#2563eb">albastru</span>), catargul e apăsat în jos (<span style="color:#dc2626">roșu</span>), iar forța coboară prin punți până la carlingă și chilă.', why: 'Fiecare piesă face un singur lucru: frânghiile trag, lemnul ține. Inginerii numesc asta <b>întindere</b> (tensiune) și <b>compresiune</b>.' },
@@ -579,7 +581,7 @@ function initMastBuild(root) {
     // chila și carlinga
     g.fillStyle = wood(g, 'oak'); g.fillRect(sx(-HX), sy(KE + 0.3), 2 * HX * S, 1.0 * S); shadeBar(g, sx(-HX), sy(KE + 0.3), 2 * HX * S, 1.0 * S, false);
     g.fillStyle = wood(g, 'oak'); g.fillRect(sx(-HX + 0.5), sy(KS), (2 * HX - 1) * S, (KS - KE - 0.3) * S); shadeBar(g, sx(-HX + 0.5), sy(KS), (2 * HX - 1) * S, (KS - KE - 0.3) * S, false);
-    if (now_(0)) { hiRect(sx(-HX), sy(KE + 0.3), 2 * HX * S, 1.0 * S); hiRect(sx(-HX + 0.5), sy(KS), (2 * HX - 1) * S, (KS - KE - 0.3) * S); label(g, sx(-HX + 1), sy(KE) + 18, 'chila', '#fde68a', true); label(g, sx(-HX + 1), sy(KS) - 6, 'carlinga', '#fde68a', true); }
+    if (now_(0)) { hiRect(sx(-HX), sy(KE + 0.3), 2 * HX * S, 1.0 * S); hiRect(sx(-HX + 0.5), sy(KS), (2 * HX - 1) * S, (KS - KE - 0.3) * S); label(g, sx(-HX + 1), sy(KE) + 18, 'chila', '#fde68a', true); label(g, sx(-HX + 1), sy(KS) - 6, 'carlinga (grinda)', '#fde68a', true); }
     // punțile, cu grinzi
     for (const y of DK) {
       g.fillStyle = wood(g, 'deck'); g.fillRect(sx(-HX + 0.5), sy(y), (2 * HX - 1) * S, 0.38 * S); shadeBar(g, sx(-HX + 0.5), sy(y), (2 * HX - 1) * S, 0.38 * S, false);
@@ -636,7 +638,7 @@ function initMastBuild(root) {
       if (now_(4)) { label(g, sx(1.8), sy(TOP + 2.7), 'capacul', '#fde68a', true); label(g, sx(2.0), sy(TOP - 2.4), 'cuiul (fid)', '#fde68a', true); label(g, sx(1.6), sy(MT - 3), 'gabierul', '#fde68a', true); }
     }
     // wanturile, ochii de lemn, lanțurile
-    const wind = step === 8, chainX = [-3.4, -1.7, 0, 1.7, 3.4];
+    const wind = step === 8, chainX = [-3.4, -2.55, -1.7, -0.85, 0, 0.85, 1.7, 2.55, 3.4]; // Hindostan: 9 wanturi pe o parte la arborele mare
     if (show(5)) {
       const k = now_(5) ? e(0.2) : 1;
       for (const cx of chainX) {
@@ -661,7 +663,7 @@ function initMastBuild(root) {
         iron(g, bx - 5, dy2 + 30, 10, r);
         g.restore();
         g.strokeStyle = '#7a5a2a'; g.lineWidth = 4; g.beginPath(); g.arc(bx, by, r, 0, Math.PI * 2); g.stroke();
-        label(g, bx, by + r + 22, 'parâma trece de 6 ori → forța × 6', '#fde68a', true, 'center');
+        label(g, bx, by + r + 22, '6 drumuri ale parâmei → forța × 6 (cu frecarea, ≈ × 3)', '#fde68a', true, 'center');
       }
     }
     if (show(6)) for (const cx of chainX) {
