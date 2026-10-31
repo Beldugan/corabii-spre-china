@@ -3,10 +3,17 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { PARTS, SHIP_INFO } from './shipdata.js';
+
+// planul de tăiere (secțiunea prin corabie), comun tuturor materialelor corăbiilor
+export const CLIP_PLANE = new THREE.Plane(new THREE.Vector3(0, 0, -1), 1e4);
+const CLIP = [CLIP_PLANE];
+export const INTERIOR_KEYS = new Set(['cala', 'ceai', 'portelan', 'mirodenii', 'hamace', 'bucatarie', 'cabina', 'pompe', 'coaste', 'carlinga', 'balast', 'pereti', 'puntea', 'tun', 'butoaie']);
 
 const PI = Math.PI;
 const lerp = (a, b, t) => a + (b - a) * t;
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
@@ -187,7 +194,13 @@ const M = {
   rope: () => mat('rope', () => new THREE.LineBasicMaterial({ color: 0x2b2118, transparent: true, opacity: 0.85 })),
   sail: (kind) => mat('sail' + kind, () => new THREE.MeshStandardMaterial({ map: sailTex(kind), side: THREE.DoubleSide, roughness: 0.95 })),
   furled: () => mat('furl', () => new THREE.MeshStandardMaterial({ color: 0xe0d5bb, roughness: 1 })),
-  deck: () => mat('deck', () => new THREE.MeshStandardMaterial({ map: deckTex(), roughness: 0.9 })),
+  deck: () => mat('deck', () => new THREE.MeshStandardMaterial({ map: deckTex(), roughness: 0.9, side: THREE.DoubleSide })),
+  deckIn: () => mat('deckIn', () => new THREE.MeshStandardMaterial({ map: deckTex(), color: 0xc9b496, roughness: 0.95, side: THREE.DoubleSide })),
+  inWood: () => mat('inWood', () => new THREE.MeshStandardMaterial({ color: 0x6a4a2c, map: woodTex('#8a6440'), roughness: 0.9, side: THREE.DoubleSide })),
+  copper: () => mat('copper', () => new THREE.MeshStandardMaterial({ color: 0xb87333, roughness: 0.35, metalness: 0.8 })),
+  iron: () => mat('iron', () => new THREE.MeshStandardMaterial({ color: 0x2d2d2d, roughness: 0.5, metalness: 0.6 })),
+  brass: () => mat('brass', () => new THREE.MeshStandardMaterial({ color: 0xd4a843, roughness: 0.3, metalness: 0.85 })),
+  glass: () => mat('glass', () => new THREE.MeshStandardMaterial({ color: 0x9fc4d8, roughness: 0.05, metalness: 0.2, emissive: 0x1a2a33 })),
   gold: () => mat('gold', () => new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.4, metalness: 0.6 })),
   white: () => mat('white', () => new THREE.MeshStandardMaterial({ color: 0xeeeae0, roughness: 0.7 })),
   red: () => mat('red', () => new THREE.MeshStandardMaterial({ color: 0x8e1f1a, roughness: 0.7 })),
@@ -247,8 +260,17 @@ function makeHull(H) {
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.setIndex(idx); geo.computeVertexNormals();
-  const hull = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, map: plankTex(), roughness: 0.62, side: THREE.DoubleSide }));
+  const hull = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, map: plankTex(), roughness: 0.62, side: THREE.FrontSide }));
   hull.castShadow = true; hull.receiveShadow = true;
+  // pereții de lemn văzuți din interior (bordajul interior)
+  const inner = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: H.inside || 0x7a5434, map: plankTex(), roughness: 0.85, side: THREE.BackSide }));
+  inner.receiveShadow = true;
+  // „masca” liniei de plutire: ascunde apa din interiorul corpului (altfel corabia pare plină cu apă)
+  const wl = [];
+  for (let i = 0; i <= 60; i++) { const t = i / 60; wl.push(new THREE.Vector2((t - 0.5) * L, -(zAt(t, 0.05) + 0.02))); }
+  for (let i = 60; i >= 0; i--) { const t = i / 60; wl.push(new THREE.Vector2((t - 0.5) * L, zAt(t, 0.05) + 0.02)); }
+  const mask = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(wl)), new THREE.MeshBasicMaterial({ colorWrite: false }));
+  mask.rotation.x = -PI / 2; mask.position.y = 0.7; mask.renderOrder = 999; mask.userData.noClip = true;
 
   // fața de la pupa (oglinda) și, la joncă, fața de la prova
   function endFace(t, tex) {
@@ -273,7 +295,7 @@ function makeHull(H) {
     return m;
   }
   const group = new THREE.Group();
-  group.add(hull);
+  group.add(hull); group.add(inner); group.add(mask);
   if (H.sternTex) group.add(endFace(0, sternTex(H.sternTex)));
   if (H.trB) group.add(endFace(1, sternTex('junk')));
 
@@ -696,8 +718,11 @@ export function buildShip(id) {
     addFlag(p, fl.kind, fl.w || 3, fl.h || 2);
   }
 
+  // ---------------- interiorul ----------------
+  const inside = addInterior(ship, hullO, S, anchors, mastTops);
   // ---------------- detalii ----------------
   const DT = S.details || {};
+  addExteriorDetails(ship, hullO, S, anchors, mastTops, yardInfo, seg);
   // brâiele (wales): scânduri groase în relief de-a lungul corpului
   for (const rel of (DT.wales || [])) for (const sd of [-1, 1]) {
     const pts = [];
@@ -830,7 +855,14 @@ export function buildShip(id) {
   ship.add(new THREE.LineSegments(lg, M.rope()));
 
   ship.userData = { id, sails, furled, flags, anchors, length: L + (bowsprit ? bowsprit.len * Math.cos(bowsprit.angle * PI / 180) : 0), hull: S.hull, height: Math.max(...mastTops.map(m => m.baseY + m.heads[m.heads.length - 1])) };
-  ship.traverse(o => { if (o.isMesh) { o.castShadow = true; } });
+  ship.userData.inside = inside;
+  ship.traverse(o => {
+    if (o.isMesh && !o.userData.noShadow) o.castShadow = true;
+    if ((o.isMesh || o.isLine || o.isInstancedMesh) && !o.userData.noClip) {
+      const ms = Array.isArray(o.material) ? o.material : [o.material];
+      ms.forEach(m => { m.clippingPlanes = CLIP; m.clipShadows = true; });
+    }
+  });
   return ship;
 }
 
@@ -876,6 +908,268 @@ function makeSailor(rnd, hat) {
   return g;
 }
 
+// ---------------------------------------------------------------- interiorul corăbiei
+function cargoTex(kind) {
+  const k = 'cargo' + kind; if (TEX[k]) return TEX[k];
+  TEX[k] = canvasTex(128, 128, (g, w, h) => {
+    if (kind === 'tea') { // ladă de ceai: lemn deschis, cu ștampilă și caractere
+      g.fillStyle = '#c9a26b'; g.fillRect(0, 0, w, h); noise(g, w, h, 0.1);
+      g.strokeStyle = '#7a5a33'; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
+      g.fillStyle = '#2b1d10'; g.font = 'bold 54px "Microsoft YaHei", "SimSun", sans-serif'; g.textAlign = 'center'; g.fillText('茶', w / 2, h * 0.62);
+      g.fillStyle = '#b3201c'; g.fillRect(w * 0.7, h * 0.08, w * 0.2, h * 0.2);
+    } else if (kind === 'crate') { // ladă cu porțelan
+      g.fillStyle = '#b08a5a'; g.fillRect(0, 0, w, h); noise(g, w, h, 0.12);
+      g.fillStyle = '#6b4a2a'; for (let i = 0; i < 4; i++) g.fillRect(0, i * h / 4, w, 4);
+      g.strokeStyle = '#6b4a2a'; g.lineWidth = 6; g.beginPath(); g.moveTo(0, 0); g.lineTo(w, h); g.stroke();
+      g.fillStyle = '#1d3f8f'; g.beginPath(); g.arc(w * 0.75, h * 0.25, 12, 0, Math.PI * 2); g.fill();
+    } else if (kind === 'sack') {
+      g.fillStyle = '#9b7d52'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(60,40,20,.35)';
+      for (let i = 0; i < w; i += 4) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, h); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(w, i); g.stroke(); }
+    } else if (kind === 'cask') {
+      g.fillStyle = '#7a5230'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(0,0,0,.3)';
+      for (let i = 0; i < w; i += 10) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, h); g.stroke(); }
+      g.fillStyle = '#2b2b2b'; g.fillRect(0, h * 0.12, w, 7); g.fillRect(0, h * 0.82, w, 7);
+    } else if (kind === 'hammock') {
+      g.fillStyle = '#e4dcc6'; g.fillRect(0, 0, w, h); noise(g, w, h, 0.06);
+      g.strokeStyle = 'rgba(120,100,70,.4)'; for (let i = 0; i < w; i += 16) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, h); g.stroke(); }
+    } else if (kind === 'chart') { // harta de pe masa căpitanului
+      g.fillStyle = '#efe2c0'; g.fillRect(0, 0, w, h); noise(g, w, h, 0.05);
+      g.strokeStyle = '#8a6a3a'; g.lineWidth = 2; g.beginPath(); g.moveTo(10, 90); g.bezierCurveTo(30, 60, 50, 100, 70, 70); g.bezierCurveTo(90, 40, 100, 60, 118, 30); g.stroke();
+      g.strokeStyle = 'rgba(80,60,30,.5)'; g.lineWidth = 1; for (let i = 0; i < 8; i++) { g.beginPath(); g.moveTo(64, 64); g.lineTo(64 + Math.cos(i * Math.PI / 4) * 60, 64 + Math.sin(i * Math.PI / 4) * 60); g.stroke(); }
+      g.strokeStyle = '#b3201c'; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(15, 20); g.lineTo(40, 70); g.lineTo(90, 85); g.lineTo(115, 50); g.stroke();
+    }
+  });
+  return TEX[k];
+}
+
+function addInterior(ship, H, S, anchors, mastTops) {
+  const IN = S.interior; if (!IN) return null;
+  const { deckH, zAt, keelY, L, bw } = H;
+  const tx = t => (t - 0.5) * L, V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const mainY = t => deckH(t) - bw;
+  const g = new THREE.Group(); g.name = 'interior'; ship.add(g);
+  const rnd = mulberry(31 + Math.round(L));
+  const dummy = new THREE.Object3D();
+  const decks = (IN.decks || []).slice().sort((a, b) => b - a);
+  const floorY = IN.floor;
+  const levels = [mainY(0.5)].concat(decks); // tavanele (punțile de deasupra)
+
+  // punțile de jos și podeaua calei
+  function strip(y, t0, t1, mat) {
+    const P = [], UV = [], I = [], N = 60;
+    for (let i = 0; i <= N; i++) { const t = lerp(t0, t1, i / N), z = Math.max(0, zAt(t, y + 0.05) - 0.05); P.push(tx(t), y, -z, tx(t), y, z); UV.push(t * 8, 0, t * 8, 1); if (i < N) { const a = i * 2; I.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } }
+    const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); gg.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2)); gg.setIndex(I); gg.computeVertexNormals();
+    const m = new THREE.Mesh(gg, mat); m.receiveShadow = true; return m;
+  }
+  decks.forEach(y => g.add(strip(y, 0.03, 0.97, M.deckIn())));
+  g.add(strip(floorY, 0.07, 0.93, M.deckIn()));
+  if (decks.length) anchors.puntea = V(tx(0.33), decks[0] + 0.6, zAt(0.33, decks[0] + 1) - 1.2);
+
+  // grinzile punților (instanțe)
+  const beams = [];
+  for (const yTop of levels) for (let x = tx(0.05); x < tx(0.95); x += 1.25) {
+    const t = x / L + 0.5, y = yTop - 0.17, w = 2 * Math.max(0, zAt(t, y) - 0.1);
+    if (w > 0.5) beams.push([x, y, w]);
+  }
+  const bm = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), M.darkWood(), beams.length);
+  beams.forEach(([x, y, w], i) => { dummy.position.set(x, y, 0); dummy.scale.set(0.24, 0.3, w); dummy.updateMatrix(); bm.setMatrixAt(i, dummy.matrix); });
+  g.add(bm);
+
+  // coastele (frames) care țin corpul, unite într-o singură geometrie
+  const ribs = [];
+  for (let t = 0.07; t <= 0.93; t += 0.028) {
+    const top = mainY(t), bot = keelY(t) + 0.3, pts = [];
+    if (top - bot < 1) continue;
+    for (let k = 0; k <= 12; k++) { const y = lerp(top, bot, k / 12); pts.push(V(tx(t), y, -Math.max(0.05, zAt(t, y) - 0.17))); }
+    for (let k = 12; k >= 0; k--) { const y = lerp(top, bot, k / 12); pts.push(V(tx(t), y, Math.max(0.05, zAt(t, y) - 0.17))); }
+    ribs.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.13, 4, false));
+  }
+  if (ribs.length) { const rm = new THREE.Mesh(mergeGeometries(ribs), M.darkWood()); rm.receiveShadow = true; g.add(rm); anchors.coaste = V(tx(0.21), (floorY + mainY(0.21)) / 2, zAt(0.21, (floorY + mainY(0.21)) / 2) - 0.6); }
+
+  // carlinga (keelson) peste chilă
+  const ks = new THREE.Mesh(new THREE.BoxGeometry(L * 0.8, 0.55, 0.6), M.darkWood()); ks.position.set(-L * 0.02, -S.hull.draft + 0.45, 0); g.add(ks);
+  anchors.carlinga = V(tx(0.6), -S.hull.draft + 0.9, 0.4);
+  // catargele coboară până pe chilă
+  mastTops.forEach((m, i) => { const r = (S.masts[i].r || 0.45) * 0.95, top = m.baseY, bot = -S.hull.draft + 0.6; const c = cyl(r, r, top - bot, M.mast(S.mastColor)); c.position.set(m.mx, (top + bot) / 2, 0); g.add(c); });
+
+  // balastul: pietre pe fundul calei
+  const nb = 320, ball = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.22, 0), new THREE.MeshStandardMaterial({ color: 0x77736b, roughness: 1 }), nb);
+  for (let i = 0; i < nb; i++) { const t = 0.15 + rnd() * 0.7, y = floorY - 0.2, z = (rnd() * 2 - 1) * Math.max(0.2, zAt(t, y) * 0.7); dummy.position.set(tx(t), y - rnd() * 0.25, z); dummy.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3); dummy.scale.setScalar(0.7 + rnd() * 0.8); dummy.updateMatrix(); ball.setMatrixAt(i, dummy.matrix); }
+  dummy.rotation.set(0, 0, 0); g.add(ball);
+  anchors.balast = V(tx(0.5), floorY - 0.2, 0.6);
+
+  // marfa: stive de lăzi, saci și butoaie (instanțe)
+  const KIND = {
+    tea: { geo: () => new THREE.BoxGeometry(0.58, 0.5, 0.58), mat: () => new THREE.MeshStandardMaterial({ map: cargoTex('tea'), roughness: 0.9 }), sx: 0.6, sy: 0.52, sz: 0.6, key: 'ceai' },
+    crate: { geo: () => new THREE.BoxGeometry(0.95, 0.75, 0.95), mat: () => new THREE.MeshStandardMaterial({ map: cargoTex('crate'), roughness: 0.9 }), sx: 1.0, sy: 0.78, sz: 1.0, key: 'portelan' },
+    sack: { geo: () => new THREE.SphereGeometry(0.5, 10, 8), mat: () => new THREE.MeshStandardMaterial({ map: cargoTex('sack'), roughness: 1 }), sx: 0.95, sy: 0.48, sz: 0.7, scale: [0.9, 0.5, 0.65], key: 'mirodenii' },
+    cask: { geo: () => new THREE.CylinderGeometry(0.34, 0.34, 0.95, 14), mat: () => new THREE.MeshStandardMaterial({ map: cargoTex('cask'), roughness: 0.8 }), sx: 0.75, sy: 1.0, sz: 0.75, key: 'butoaie' },
+  };
+  for (const c of (IN.cargo || [])) {
+    const K = KIND[c.kind], list = [];
+    const top = c.y0 + (c.y1 - c.y0) * (c.fill ?? 1);
+    for (let y = c.y0 + K.sy / 2; y + K.sy / 2 <= top; y += K.sy)
+      for (let x = tx(c.t0); x <= tx(c.t1); x += K.sx) {
+        const t = x / L + 0.5, zmax = zAt(t, y - K.sy / 2) - 0.32;
+        for (let z = (c.aisle ?? 0.8) + K.sz / 2; z + K.sz / 2 <= zmax; z += K.sz) { list.push([x, y, z]); list.push([x, y, -z]); }
+      }
+    if (!list.length) continue;
+    const im = new THREE.InstancedMesh(K.geo(), K.mat(), list.length);
+    list.forEach(([x, y, z], i) => { dummy.position.set(x + (rnd() - 0.5) * 0.04, y, z); dummy.rotation.y = (rnd() - 0.5) * 0.06; if (K.scale) dummy.scale.set(...K.scale); else dummy.scale.set(1, 1, 1); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); });
+    dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
+    im.castShadow = true; im.receiveShadow = true; g.add(im);
+    const mid = list[Math.floor(list.length * 0.55)];
+    if (!anchors[K.key]) anchors[K.key] = V(mid[0], top + 0.3, Math.abs(mid[2]));
+  }
+  anchors.cala = V(tx(0.5), (floorY + (decks.length ? decks[decks.length - 1] : mainY(0.5))) / 2 + 0.6, 0);
+
+  // hamacele marinarilor
+  if (IN.hammocks) {
+    const hm = IN.hammocks, list = [];
+    for (let x = tx(hm.t0); x <= tx(hm.t1); x += 2.1) { const t = x / L + 0.5, zmax = zAt(t, hm.y) - 0.9; for (let z = -zmax; z <= zmax; z += 0.62) list.push([x, hm.y, z]); }
+    const geo = new THREE.CylinderGeometry(0.3, 0.3, 1.9, 10, 1, true, PI * 0.5, PI); geo.rotateZ(PI / 2);
+    const im = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ map: cargoTex('hammock'), side: THREE.DoubleSide, roughness: 1 }), list.length);
+    list.forEach(([x, y, z], i) => { dummy.position.set(x, y - 0.25, z); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); });
+    g.add(im);
+    anchors.hamace = V(tx((hm.t0 + hm.t1) / 2), hm.y - 0.1, 0.3);
+  }
+  // bucătăria (soba de fier, cu oale de cupru și coș)
+  if (IN.stove) {
+    const st = IN.stove, x = tx(st.t);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.0, 1.2), M.iron()); box.position.set(x, st.y + 0.5, 0); g.add(box);
+    for (const z of [-0.3, 0.3]) { const pot = cyl(0.25, 0.22, 0.35, M.copper(), 12); pot.position.set(x + 0.2, st.y + 1.18, z); g.add(pot); }
+    const ch = cyl(0.15, 0.15, mainY(st.t) + 1.6 - st.y - 1.0, M.iron(), 8); ch.position.set(x - 0.4, (st.y + 1.0 + mainY(st.t) + 1.6) / 2, 0); g.add(ch);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.3, 8), M.iron()); cap.position.set(x - 0.4, mainY(st.t) + 1.75, 0); ship.add(cap);
+    anchors.bucatarie = V(x, st.y + 1.3, 0.8);
+  }
+  // cabina căpitanului: perete cu ușă, masă cu hartă, scaune, cufăr, pat
+  if (IN.cabin) {
+    const cb = IN.cabin, y = cb.y, xw = tx(cb.t1), half = zAt(cb.t1, y + 1.1) - 0.05;
+    for (const sd of [-1, 1]) { const w = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.1, half - 0.55), M.inWood()); w.position.set(xw, y + 1.05, sd * (0.55 + (half - 0.55) / 2)); g.add(w); }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 1.1), M.inWood()); lintel.position.set(xw, y + 1.95, 0); g.add(lintel);
+    const cx = tx((cb.t0 + cb.t1) / 2);
+    const table = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 1.2), M.wood()); table.position.set(cx, y + 0.8, 0); g.add(table);
+    for (const [dx, dz] of [[-1, -0.5], [1, -0.5], [-1, 0.5], [1, 0.5]]) { const lg = cyl(0.05, 0.05, 0.8, M.darkWood(), 6); lg.position.set(cx + dx, y + 0.4, dz); g.add(lg); }
+    const chart = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.8), new THREE.MeshStandardMaterial({ map: cargoTex('chart'), roughness: 0.9 })); chart.rotation.x = -PI / 2; chart.position.set(cx, y + 0.85, 0); g.add(chart);
+    const sext = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.015, 4, 12, PI / 3), M.brass()); sext.rotation.x = -PI / 2; sext.position.set(cx + 0.6, y + 0.86, 0.25); g.add(sext);
+    for (const [dx, dz] of [[-0.6, -0.95], [0.6, -0.95], [-0.6, 0.95], [0.6, 0.95]]) { const ch = new THREE.Group(); const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.5), M.wood()); seat.position.y = 0.48; const back = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.06), M.wood()); back.position.set(0, 0.8, dz > 0 ? 0.22 : -0.22); ch.add(seat, back); ch.position.set(cx + dx, y, dz); g.add(ch); }
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.6), M.darkWood()); chest.position.set(cx + 1.6, y + 0.3, half - 0.6); g.add(chest);
+    const bunk = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 0.9), M.inWood()); bunk.position.set(cx - 1.4, y + 0.6, -(half - 0.7)); g.add(bunk);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffe2a0, emissive: 0xffb84d, emissiveIntensity: 1.5 })); lamp.position.set(cx, y + 2.0, 0); g.add(lamp);
+    anchors.cabina = V(cx, y + 1.3, 0.6);
+  }
+  // pompele de santină, lângă catargul mare
+  const mm = mastTops[S.mainIndex];
+  for (const z of [-0.7, 0.7]) { const p = cyl(0.17, 0.17, mainY(0.5) + 1.0 - floorY, M.wood(), 10); p.position.set(mm.mx - 1.3, (mainY(0.5) + 1.0 + floorY) / 2, z); g.add(p); const hd = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.12, 1.3), M.iron()); hd.position.set(mm.mx - 1.3, mainY(0.5) + 1.05, z); ship.add(hd); }
+  anchors.pompe = V(mm.mx - 1.3, floorY + 1.4, 0.9);
+  // scările dintre punți
+  const ys = [mainY(0.42)].concat(decks, [floorY]);
+  for (let i = 0; i < ys.length - 1; i++) {
+    const x0 = tx(0.42) - 0.3, top = ys[i], bot = ys[i + 1], h = top - bot, run = h * 0.55;
+    for (const z of [-0.35, 0.35]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.08, Math.hypot(h, run), 0.08), M.wood()); r.position.set(x0 - run / 2, bot + h / 2, z); r.rotation.z = Math.atan2(run, h); g.add(r); }
+    const n = Math.floor(h / 0.3);
+    for (let k = 1; k < n; k++) { const f = k / n; const st = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.7), M.wood()); st.position.set(x0 - run * (1 - f), bot + h * f, 0); g.add(st); }
+  }
+  // tunurile pe puntea de tunuri, în dreptul porturilor
+  for (const row of (S.gunports || [])) {
+    if (row.inner == null) continue;
+    for (let t = row.t0; t <= row.t1 + 1e-6; t += row.dt) for (const sd of [-1, 1]) {
+      const y = row.inner, gun = makeCannon(); gun.position.set(tx(t), y, sd * (zAt(t, y + 0.8) - 1.25)); gun.rotation.y = sd > 0 ? 0 : PI; g.add(gun);
+    }
+    anchors.tun = V(tx((row.t0 + row.t1) / 2), row.inner + 1.0, zAt(0.5, row.inner + 1) - 1.4);
+  }
+  // pereții etanși ai joncii (o invenție chinezească)
+  for (const t of (IN.bulkheads || [])) {
+    const pts = [], top = mainY(t), bot = keelY(t);
+    for (let k = 0; k <= 14; k++) { const y = lerp(top, bot, k / 14); pts.push(new THREE.Vector2(-Math.max(0, zAt(t, y) - 0.06), y)); }
+    for (let k = 14; k >= 0; k--) { const y = lerp(top, bot, k / 14); pts.push(new THREE.Vector2(Math.max(0, zAt(t, y) - 0.06), y)); }
+    const geo = new THREE.ShapeGeometry(new THREE.Shape(pts)); geo.rotateY(PI / 2);
+    const w = new THREE.Mesh(geo, M.inWood()); w.position.x = tx(t); g.add(w);
+    if (!anchors.pereti) anchors.pereti = V(tx(t) + 0.2, (top + bot) / 2, 0.8);
+  }
+  // marinari la lucru în interior
+  for (let i = 0; i < (IN.crew || 0); i++) {
+    const lv = decks.length ? decks[i % decks.length] : floorY;
+    const t = 0.3 + rnd() * 0.45, half = zAt(t, lv + 0.5) - 1.6; if (half < 0.4) continue;
+    const p = makeSailor(rnd, S.details && S.details.hat); p.position.set(tx(t), lv, (rnd() * 2 - 1) * half); p.rotation.y = rnd() * 6; g.add(p);
+  }
+  // felinare + lumini calde în interior (aprinse doar la corabia afișată)
+  const lights = [];
+  const spots = [[0.3, (floorY + (decks[decks.length - 1] ?? mainY(0.5))) / 2 + 0.8], [0.7, (floorY + (decks[decks.length - 1] ?? mainY(0.5))) / 2 + 0.8]];
+  decks.forEach(y => spots.push([0.5, y + 2.0]));
+  if (IN.cabin) spots.push([(IN.cabin.t0 + IN.cabin.t1) / 2, IN.cabin.y + 1.9]);
+  spots.slice(0, 5).forEach(([t, y]) => {
+    const l = new THREE.PointLight(0xffc477, 28, 26, 1.6); l.position.set(tx(t), y, 0); ship.add(l); lights.push(l);
+    const ln = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.3, 6), new THREE.MeshStandardMaterial({ color: 0xffe2a0, emissive: 0xffa53d, emissiveIntensity: 1.2 }));
+    ln.position.set(tx(t), y + 0.2, 0); ln.userData.noShadow = true; g.add(ln);
+  });
+  ship.userData.lights = lights;
+
+  // pozițiile camerei pentru vizita în interior
+  const hy = (floorY + (decks[decks.length - 1] ?? mainY(0.5))) / 2 + 0.5;
+  const P = {
+    cala: { pos: V(tx(0.3), hy, 0.55), look: V(tx(0.5), hy - 0.4, 0.55) },
+    keel: { from: V(tx(0.33), -S.hull.draft - 9, 6), pos: V(tx(0.31), hy - 0.3, 0.55), look: V(tx(0.5), hy - 0.2, 0.55) },
+  };
+  if (decks.length) P.puntea = { pos: V(tx(0.3), decks[0] + 1.6, 0), look: V(tx(0.65), decks[0] + 1.3, 0) };
+  if (IN.cabin) P.cabina = { pos: V(tx(IN.cabin.t1) - 0.4, IN.cabin.y + 1.6, 0), look: V(tx(IN.cabin.t0), IN.cabin.y + 1.0, 0) };
+  return P;
+}
+
+// ---------------------------------------------------------------- detalii suplimentare pe exterior
+function addExteriorDetails(ship, H, S, anchors, mastTops, yardInfo, seg) {
+  const { deckH, zAt, halfDeck, L, bw } = H;
+  const tx = t => (t - 0.5) * L, V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const dummy = new THREE.Object3D();
+  // balustrade cu cavile (pinrails) pe interiorul parapetului
+  const pins = [];
+  for (const sd of [-1, 1]) for (let t = 0.2; t <= 0.85; t += 0.012) {
+    const y = deckH(t) - 0.45, z = sd * (zAt(t, y) - 0.25);
+    pins.push([tx(t), y, z]);
+  }
+  const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.035, 0.03, 0.45, 5), M.darkWood(), pins.length);
+  pins.forEach(([x, y, z], i) => { dummy.position.set(x, y, z); dummy.updateMatrix(); pm.setMatrixAt(i, dummy.matrix); });
+  ship.add(pm);
+  for (const sd of [-1, 1]) {
+    const pts = []; for (let i = 0; i <= 30; i++) { const t = 0.2 + 0.65 * i / 30, y = deckH(t) - 0.55; pts.push(V(tx(t), y, sd * (zAt(t, y) - 0.25))); }
+    ship.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.07, 4, false), M.wood()));
+  }
+  // nările ancorei (hawse holes) și lanțul ancorei până la cabestan
+  const ht = 0.955, hy = deckH(ht) - 1.0;
+  for (const sd of [-1, 1]) {
+    const hz = zAt(ht, hy);
+    const hole = cyl(0.28, 0.28, 0.3, M.iron(), 12); hole.rotation.x = PI / 2; hole.position.set(tx(ht), hy, sd * hz); ship.add(hole);
+    if (S.details && S.details.capstan != null) {
+      const ct = S.details.capstan, cy = deckH(ct) - bw + 0.12;
+      const curve = new THREE.CatmullRomCurve3([V(tx(ht) - 0.3, deckH(ht) - bw + 0.12, sd * Math.max(0.4, zAt(ht, hy) - 0.8)), V(tx((ht + ct) / 2), cy, sd * 0.9), V(tx(ct) + 0.6, cy, sd * 0.4)]);
+      const chain = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.07, 5, false), M.iron()); ship.add(chain);
+    }
+  }
+  // scripeți (blocks) la capetele vergilor
+  const blocks = [];
+  for (const y of yardInfo) for (const sd of [-1, 1]) blocks.push(y.toShip(y.h - 0.35, sd * (y.w / 2 - 0.4)));
+  const bk = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.32, 0.16), M.darkWood(), blocks.length);
+  blocks.forEach((p, i) => { dummy.position.copy(p); dummy.updateMatrix(); bk.setMatrixAt(i, dummy.matrix); });
+  if (blocks.length) ship.add(bk);
+  // busola (habitaclul) lângă timonă
+  if (S.wheel) {
+    const wy = deckH(S.wheel.t) - bw + (S.wheel.lift || 0);
+    const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 1.0, 10), M.wood()); bin.position.set(tx(S.wheel.t) + 1.4, wy + 0.5, 0); ship.add(bin);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 8, 0, PI * 2, 0, PI / 2), M.brass()); dome.position.set(tx(S.wheel.t) + 1.4, wy + 1.0, 0); ship.add(dome);
+  }
+  // clopotul corăbiei
+  const bt = 0.86, by = deckH(bt) - bw;
+  const belf = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.6, 0.15), M.wood()); belf.position.set(tx(bt), by + 0.8, 0.5); ship.add(belf);
+  const belf2 = belf.clone(); belf2.position.z = -0.5; ship.add(belf2);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 1.15), M.wood()); bar.position.set(tx(bt), by + 1.6, 0); ship.add(bar);
+  const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.25, 0.35, 12, 1, true), M.brass()); bell.position.set(tx(bt), by + 1.32, 0); ship.add(bell);
+  // butoaie cu apă pe punte
+  const mm = mastTops[S.mainIndex];
+  for (let i = 0; i < 3; i++) { const b = cyl(0.33, 0.33, 0.9, new THREE.MeshStandardMaterial({ map: cargoTex('cask'), roughness: 0.8 }), 12); b.position.set(mm.mx + 1.8 + i * 0.75, deckH(0.5) - bw + 0.45, -(halfDeck(0.5) - 1.6)); ship.add(b); }
+  // balamalele cârmei
+  for (let k = 0; k < 4; k++) { const pin = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.5), M.copper()); pin.position.set(tx(0) + 0.3, -S.hull.draft * 0.85 + k * (S.hull.draft * 0.8 / 3), 0); ship.add(pin); }
+}
+
 // ---------------------------------------------------------------- specificațiile
 const WAL = (rel, step, w) => (rel % step) < w;
 export const SPECS = {
@@ -900,6 +1194,7 @@ export const SPECS = {
     wheel: { t: 0.04, lift: 1.2 },
     flags: [{ mast: 1, kind: 'pennantR', w: 4, h: 0.6 }],
     rudder: { chord: 2.4, top: 2.2 },
+    interior: { decks: [-1.0], floor: -4.9, cargo: [{ kind: 'tea', t0: 0.1, t1: 0.9, y0: -4.9, y1: -1.2, fill: 0.85 }, { kind: 'tea', t0: 0.5, t1: 0.86, y0: -1.0, y1: 1.3, fill: 0.5 }, { kind: 'cask', t0: 0.14, t1: 0.22, y0: -1.0, y1: 0.2, aisle: 1.1 }], stove: { t: 0.78, y: -1.0 }, cabin: { t0: 0.02, t1: 0.12, y: -1.0 }, crew: 3 },
     details: { wales: [], anchor: 2.4, capstan: 0.86, hatches: [0.47, 0.55, 0.7], figure: 'white', crew: 9, lanterns: 0 },
   },
   hindostan: {
@@ -920,9 +1215,10 @@ export const SPECS = {
     blocks: [{ t0: 0.0, t1: 0.3, h: 1.3 }, { t0: 0.84, t1: 1.0, h: 1.0 }],
     boats: [{ t: 0.66, len: 7, y: 1.8 }, { t: 0.43, len: 6, y: 1.8 }],
     wheel: { t: 0.22, lift: 1.3 },
-    gunports: [{ t0: 0.18, t1: 0.82, dt: 0.06, rel: 3.1, size: 0.85, guns: true }, { t0: 0.07, t1: 0.27, dt: 0.065, rel: 1.05, size: 0.55 }],
+    gunports: [{ t0: 0.18, t1: 0.82, dt: 0.06, rel: 3.1, size: 0.85, guns: true, lids: true, inner: 2.4 }, { t0: 0.07, t1: 0.27, dt: 0.065, rel: 1.05, size: 0.55 }],
     flags: [{ kind: 'eic', y: 6, w: 6, h: 3.6 }, { mast: 1, kind: 'pennantR', w: 6, h: 0.6 }],
     rudder: { chord: 2.6, top: 3.5 },
+    interior: { decks: [2.4, -0.8], floor: -4.7, cargo: [{ kind: 'tea', t0: 0.32, t1: 0.88, y0: -4.7, y1: -1.05, fill: 0.85 }, { kind: 'crate', t0: 0.12, t1: 0.3, y0: -4.7, y1: -1.05, fill: 0.8 }, { kind: 'cask', t0: 0.1, t1: 0.3, y0: -0.8, y1: 2.0, aisle: 1.2 }], hammocks: { t0: 0.48, t1: 0.8, y: 4.65 }, stove: { t: 0.84, y: 2.4 }, cabin: { t0: 0.02, t1: 0.15, y: 2.4 }, crew: 6 },
     details: { wales: [2.35, 3.85, 5.1], anchor: 3.2, capstan: 0.6, hatches: [0.43, 0.7], figure: 'gold', crew: 14, lanterns: 3, lanternY: 1.6, deckGuns: [{ t: 0.12, lift: 1.3 }, { t: 0.2, lift: 1.3 }] },
   },
   madre: {
@@ -946,9 +1242,10 @@ export const SPECS = {
       { t0: 0.79, t1: 1.0, h: 2.8, over: 4.5, inset: 1.0 },
       { t0: 0.84, t1: 1.0, h: 1.9, over: 2.5, lift: 2.8, inset: 0.9 },
     ],
-    gunports: [{ t0: 0.2, t1: 0.75, dt: 0.07, rel: 3.2, size: 0.6, guns: true, lids: true }, { t0: 0.28, t1: 0.7, dt: 0.07, rel: 4.8, size: 0.55, guns: true }],
+    gunports: [{ t0: 0.2, t1: 0.75, dt: 0.07, rel: 3.3, size: 0.6, guns: true, lids: true, inner: 0.9 }, { t0: 0.3, t1: 0.68, dt: 0.08, rel: 0.62, size: 0.45, guns: true }],
     flags: [{ mast: 1, kind: 'christ', w: 3.4, h: 2.2 }, { mast: 0, kind: 'christ', w: 2.6, h: 1.7 }, { mast: 2, kind: 'pennantR', w: 5, h: 0.5 }],
     rudder: { chord: 2.8, top: 3 },
+    interior: { decks: [0.9, -2.2], floor: -6.5, cargo: [{ kind: 'sack', t0: 0.32, t1: 0.86, y0: -6.5, y1: -2.45, fill: 0.8 }, { kind: 'crate', t0: 0.14, t1: 0.3, y0: -6.5, y1: -2.45, fill: 0.7 }, { kind: 'cask', t0: 0.55, t1: 0.8, y0: -2.2, y1: 0.4, aisle: 1.2 }], hammocks: { t0: 0.5, t1: 0.78, y: 3.05 }, stove: { t: 0.8, y: 0.9 }, cabin: { t0: 0.02, t1: 0.17, y: 0.9 }, crew: 6 },
     details: { wales: [1.6, 3.1, 4.6, 6.2], anchor: 3.4, capstan: 0.44, hatches: [0.62], crew: 14, lanterns: 1, lanternY: 7.2, lanternT: 0.02 },
   },
   keying: {
@@ -975,6 +1272,7 @@ export const SPECS = {
     oculus: { t: 0.955, rel: 1.6 },
     flags: [{ mast: 1, kind: 'junk', w: 5, h: 1.2 }, { mast: 0, kind: 'junk', w: 3.6, h: 0.9 }, { mast: 2, kind: 'junk', w: 2.6, h: 0.7 }],
     rudder: { chord: 4.5, top: 6, deep: 1.5 },
+    interior: { decks: [], floor: -2.9, cargo: [{ kind: 'crate', t0: 0.27, t1: 0.54, y0: -2.9, y1: 1.6, fill: 0.7 }, { kind: 'sack', t0: 0.57, t1: 0.83, y0: -2.9, y1: 1.6, fill: 0.6 }], bulkheads: [0.16, 0.26, 0.36, 0.46, 0.56, 0.66, 0.76, 0.86], crew: 3 },
     details: { wales: [0.85, 1.95], anchor: 3.0, woodAnchor: true, capstan: 0.9, hatches: [0.66], crew: 11, hat: 'cone', lanterns: 2, lanternY: 4.6 },
   },
 };
@@ -1048,7 +1346,9 @@ export class ShipViewer {
     this.renderer.setSize(W, Hh);
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.05;
+    this.renderer.localClippingEnabled = true;
     el.appendChild(this.renderer.domElement);
+    this.cut = 0; this.insideMode = false; this.under = false; this.anim = null;
     this.labelR = new CSS2DRenderer(); this.labelR.setSize(W, Hh);
     Object.assign(this.labelR.domElement.style, { position: 'absolute', top: '0', left: '0', pointerEvents: 'none' });
     el.appendChild(this.labelR.domElement);
@@ -1082,6 +1382,99 @@ export class ShipViewer {
     el.appendChild(info); this.infoBox = info;
     const onFs = () => { const on = (document.fullscreenElement || document.webkitFullscreenElement) === el; fs.textContent = on ? '✕ Ieși din ecran complet' : '⛶ Ecran complet'; el.classList.toggle('isfull', on); setTimeout(() => this.resize(), 60); };
     document.addEventListener('fullscreenchange', onFs); document.addEventListener('webkitfullscreenchange', onFs);
+    if (!opts.thumbs) this.makeInteriorUI();
+  }
+  // ---------------- vizita în interior
+  makeInteriorUI() {
+    const box = document.createElement('div'); box.className = 'vin';
+    box.innerHTML = `<div class="vin-h">🔍 Interiorul corăbiei</div>
+      <label class="vin-cut">✂ Taie corabia <input type="range" min="0" max="100" value="0"></label>
+      <div class="vin-go">
+        <button type="button" data-in="keel">⬆ Intră prin chilă</button>
+        <button type="button" data-in="cala">📦 Cala</button>
+        <button type="button" data-in="puntea">🪵 Puntea de jos</button>
+        <button type="button" data-in="cabina">🧭 Cabina căpitanului</button>
+        <button type="button" data-in="out" class="out">↩ Ieși afară</button>
+      </div>
+      <div class="vin-pad hidden"><span>Mergi:</span>
+        <button type="button" data-mv="f" title="înainte (W / ↑)">⬆</button><button type="button" data-mv="b" title="înapoi (S / ↓)">⬇</button>
+        <button type="button" data-mv="l" title="stânga (A / ←)">⬅</button><button type="button" data-mv="r" title="dreapta (D / →)">➡</button>
+        <button type="button" data-mv="u" title="urcă (E)">⤒</button><button type="button" data-mv="d" title="coboară (Q)">⤓</button></div>
+      <button type="button" class="vin-toggle" title="arată / ascunde">▾</button>`;
+    this.el.appendChild(box); this.inUI = box;
+    const cut = box.querySelector('.vin-cut input');
+    cut.addEventListener('input', () => this.setCut(+cut.value / 100));
+    this.cutInput = cut;
+    box.querySelectorAll('[data-in]').forEach(b => b.addEventListener('click', () => b.dataset.in === 'out' ? this.exitInside() : this.goInside(b.dataset.in)));
+    box.querySelectorAll('[data-mv]').forEach(b => {
+      let iv = null; const go = () => this.moveCam(b.dataset.mv);
+      b.addEventListener('pointerdown', e => { e.preventDefault(); go(); iv = setInterval(go, 90); });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, () => clearInterval(iv)));
+    });
+    box.querySelector('.vin-toggle').addEventListener('click', () => box.classList.toggle('min'));
+    window.addEventListener('keydown', e => {
+      if (!this.insideMode || !this.running || !this.el.offsetParent) return;
+      const k = { w: 'f', arrowup: 'f', s: 'b', arrowdown: 'b', a: 'l', arrowleft: 'l', d: 'r', arrowright: 'r', e: 'u', q: 'd' }[e.key.toLowerCase()];
+      if (k) { e.preventDefault(); this.moveCam(k); }
+    });
+  }
+  refreshInteriorUI() {
+    if (!this.inUI) return;
+    const P = this.current && this.current.userData.inside;
+    this.inUI.classList.toggle('hidden', !P || this.compare);
+    if (!P) return;
+    this.inUI.querySelectorAll('[data-in]').forEach(b => { const k = b.dataset.in; b.classList.toggle('hidden', k === 'out' ? !this.insideMode : !P[k]); });
+    this.inUI.querySelector('.vin-pad').classList.toggle('hidden', !this.insideMode);
+    this.inUI.querySelector('.vin-cut').classList.toggle('hidden', this.insideMode);
+  }
+  setCut(v) { this.cut = v; if (this.cutInput) this.cutInput.value = Math.round(v * 100); this.updateWater(); this.updateLabelVis(); }
+  updateWater() {
+    const see = this.under || this.cut > 0.01 || this.insideMode || !!this.anim;
+    this.water.material.uniforms.uOpacity.value = see ? 0.45 : 0.96; this.water.material.depthWrite = !see;
+    this.water.visible = !(this.insideMode && !this.anim); // înăuntru nu vedem marea (corpul e închis)
+  }
+  goInside(spot) {
+    const P = this.current && this.current.userData.inside; if (!P || !P[spot]) return;
+    const S = P[spot];
+    this.setCut(0); this.controls.autoRotate = false;
+    this.controls.minDistance = 0.05; this.controls.maxDistance = 8; this.controls.maxPolarAngle = PI;
+    this.camera.near = 0.05; this.camera.updateProjectionMatrix();
+    const dir = S.look.clone().sub(S.pos).normalize();
+    const endCam = S.pos.clone(), endTgt = S.pos.clone().addScaledVector(dir, 0.7);
+    if (S.from) { // de sub corabie, urcăm prin chilă în cală
+      this.anim = { t: 0, dur: 3.2, c0: S.from.clone(), c1: endCam, g0: V3(S.from.x + 0.5, S.from.y + 6, 0), g1: endTgt };
+    } else { this.anim = { t: 0, dur: 1.4, c0: this.camera.position.clone(), c1: endCam, g0: this.controls.target.clone(), g1: endTgt }; }
+    this.insideMode = true; this.updateWater(); this.updateLabelVis(); this.refreshInteriorUI();
+  }
+  exitInside() {
+    this.insideMode = false; this.anim = null;
+    this.controls.maxPolarAngle = PI * 0.62; this.camera.near = 0.5; this.camera.updateProjectionMatrix();
+    this.setShip(this.current.name); this.updateWater();
+  }
+  moveCam(k) {
+    const c = this.camera.position, t = this.controls.target;
+    const f = t.clone().sub(c); f.y = 0; if (f.lengthSq() < 1e-6) f.set(1, 0, 0); f.normalize();
+    const r = new THREE.Vector3(-f.z, 0, f.x), d = new THREE.Vector3(), st = 0.45;
+    if (k === 'f') d.copy(f).multiplyScalar(st); if (k === 'b') d.copy(f).multiplyScalar(-st);
+    if (k === 'r') d.copy(r).multiplyScalar(st); if (k === 'l') d.copy(r).multiplyScalar(-st);
+    if (k === 'u') d.set(0, st, 0); if (k === 'd') d.set(0, -st, 0);
+    c.add(d); t.add(d);
+  }
+  updateLabelVis() {
+    const showIn = this.cut > 0.15 || this.insideMode;
+    this.labels.forEach(l => {
+      const key = l.userData.key; if (!key) return;
+      const isIn = INTERIOR_KEYS.has(key);
+      const on = this.showLabels && (isIn ? showIn : !this.insideMode);
+      l.visible = on; l.element.style.display = on ? '' : 'none';
+    });
+  }
+  applyClip() {
+    if (this.cut <= 0.001 || this.compare || !this.current) { CLIP_PLANE.constant = 1e4; return; }
+    const d = this.camera.position.clone().sub(this.controls.target); d.y = 0; if (d.lengthSq() < 1e-6) d.set(0, 0, 1); d.normalize();
+    const B = this.current.userData.hull.B;
+    CLIP_PLANE.normal.set(-d.x, 0, -d.z);
+    CLIP_PLANE.constant = lerp(B / 2 + 1.5, -0.4, this.cut);
   }
   toggleFull() {
     const el = this.el, cur = document.fullscreenElement || document.webkitFullscreenElement;
@@ -1116,7 +1509,10 @@ export class ShipViewer {
     if (!keepView) { this.camera.position.set(L * 0.72, s.userData.height * 0.45, L * 0.95); }
     this.controls.minDistance = 20; this.controls.maxDistance = 320;
     this.sun.shadow.camera.left = -L; this.sun.shadow.camera.right = L; this.sun.shadow.camera.updateProjectionMatrix();
-    this.applySails(); this.makeLabels();
+    for (const k in this.ships) (this.ships[k].userData.lights || []).forEach(l => l.visible = this.ships[k] === s);
+    if (this.insideMode) { this.insideMode = false; this.anim = null; this.controls.maxPolarAngle = PI * 0.62; this.camera.near = 0.5; this.camera.updateProjectionMatrix(); }
+    this.setCut(0);
+    this.applySails(); this.makeLabels(); this.updateLabelVis(); this.refreshInteriorUI();
   }
   setCompare() {
     this.clearScene(); this.compare = true; this.current = null;
@@ -1140,7 +1536,9 @@ export class ShipViewer {
     this.controls.target.set(0, 14, 0); this.camera.position.set(0, 26, total * 0.95);
     this.controls.minDistance = 30; this.controls.maxDistance = 700;
     this.sun.shadow.camera.left = -total / 2 - 20; this.sun.shadow.camera.right = total / 2 + 20; this.sun.shadow.camera.updateProjectionMatrix();
-    this.applySails();
+    for (const k in this.ships) (this.ships[k].userData.lights || []).forEach(l => l.visible = false);
+    this.insideMode = false; this.anim = null; this.controls.maxPolarAngle = PI * 0.62; this.camera.near = 0.5; this.camera.updateProjectionMatrix(); this.setCut(0);
+    this.applySails(); this.refreshInteriorUI();
   }
   makeLabels() {
     if (!this.current) return;
@@ -1149,15 +1547,15 @@ export class ShipViewer {
       if (!PARTS[key] || !a[key]) continue;
       const div = document.createElement('button'); div.className = 'lbl3d part'; div.textContent = PARTS[key].ro.replace(/ \(.*/, '');
       div.addEventListener('click', e => { e.stopPropagation(); this.onPart(key); if (this.el.classList.contains('isfull')) this.showInfo(`<b>${PARTS[key].ro}</b><br>${PARTS[key].d}`); });
-      const o = new CSS2DObject(div); o.position.copy(a[key]); o.visible = this.showLabels; this.current.add(o); this.labels.push(o);
+      const o = new CSS2DObject(div); o.userData.key = key; o.position.copy(a[key]); o.visible = this.showLabels; this.current.add(o); this.labels.push(o);
     }
   }
-  setLabels(on) { this.showLabels = on; if (!this.compare) this.labels.forEach(l => { l.visible = on; l.element.style.display = on ? '' : 'none'; }); }
+  setLabels(on) { this.showLabels = on; if (!this.compare) this.updateLabelVis(); }
   setSails(up) { this.sailsUp = up; this.applySails(); }
   applySails() {
     for (const id in this.ships) { const u = this.ships[id].userData; u.sails.forEach(s => s.visible = this.sailsUp); u.furled.forEach(f => f.visible = !this.sailsUp); }
   }
-  setUnderwater(on) { this.water.material.uniforms.uOpacity.value = on ? 0.45 : 0.96; this.water.material.depthWrite = !on; }
+  setUnderwater(on) { this.under = on; this.updateWater(); }
   setAuto(on) { this.controls.autoRotate = on; }
   view(name) {
     if (!this.current) return;
@@ -1175,14 +1573,21 @@ export class ShipViewer {
       this.water.material.uniforms.uTime.value = t;
       for (const id in this.ships) {
         const s = this.ships[id]; if (!s.parent) continue;
-        s.rotation.z = Math.sin(t * 0.6 + s.position.x) * 0.006; s.rotation.x = Math.sin(t * 0.8 + s.position.x) * 0.012; s.position.y = Math.sin(t * 0.9) * 0.12;
+        const calm = this.insideMode ? 0.25 : 1; // înăuntru legănăm mai puțin, să nu amețim
+        s.rotation.z = Math.sin(t * 0.6 + s.position.x) * 0.006 * calm; s.rotation.x = Math.sin(t * 0.8 + s.position.x) * 0.012 * calm; s.position.y = Math.sin(t * 0.9) * 0.12 * calm;
         for (const f of s.userData.flags) {
           const p = f.geometry.attributes.position, b = f.userData.base;
           for (let i = 0; i < p.count; i++) { const x = b[i * 3]; p.setZ(i, Math.sin(x * 1.3 - t * 6) * 0.25 * (-x / f.userData.w)); }
           p.needsUpdate = true;
         }
       }
+      if (this.anim) {
+        const a = this.anim; const nowT = performance.now() / 1000; if (a.last == null) a.last = nowT; a.t += Math.min(0.1, nowT - a.last); a.last = nowT; const k = Math.min(1, a.t / a.dur), e = k * k * (3 - 2 * k);
+        this.camera.position.lerpVectors(a.c0, a.c1, e); this.controls.target.lerpVectors(a.g0, a.g1, e);
+        if (k >= 1) { this.anim = null; this.updateWater(); }
+      }
       this.controls.update();
+      this.applyClip();
       this.renderer.render(this.scene, this.camera);
       this.labelR.render(this.scene, this.camera);
     };
@@ -1196,6 +1601,7 @@ export class ShipViewer {
     this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     this.camera.position.set(L * 0.85, H * 0.35, L * 1.05); this.controls.target.set(0, H * 0.4, 0); this.controls.update();
     this.labels.forEach(l => l.visible = false);
+    CLIP_PLANE.constant = 1e4;
     this.renderer.render(this.scene, this.camera);
     const url = this.renderer.domElement.toDataURL('image/jpeg', 0.85);
     this.renderer.setSize(keep.sz.x, keep.sz.y); this.resize();
