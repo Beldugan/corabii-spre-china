@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ro" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corăbii spre China</title>
+<meta name="description" content="Aplicație interactivă pentru copii: cum se conducea o corabie cu pânze, corăbiile reale care au mers în China (în 3D), vânturile și curenții, istoria expedițiilor, simularea călătoriei de la Londra la China, jocuri de navigație și problema zilei.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛵</text></svg>">
+<link rel="stylesheet" href="assets/css/style.css?v=1">
+<link rel="stylesheet" href="assets/css/corabii.css?v=1">
+</head>
+<body>
+
+<header class="top">
+  <div class="inner">
+    <h1>⛵ Corăbii spre China</h1>
+    <div class="badges">
+      <span class="pill">⭐ <b id="starTotal">0</b></span>
+      <button class="pill" id="themeBtn" title="temă deschisă / întunecată">◐</button>
+    </div>
+    <p>Marele drum al corăbiilor cu pânze din Anglia până în China: cum se conduceau, ce corăbii au mers acolo, ce vânturi le-au ajutat și cum a arătat călătoria.</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="man" aria-selected="true">⚓ 1. Cum se conduce</button>
+    <button role="tab" data-tab="ships">🚢 2. Corăbiile 3D</button>
+    <button role="tab" data-tab="wind">🌬️ 3. Vânturi și curenți</button>
+    <button role="tab" data-tab="hist">📜 4. Istoria</button>
+    <button role="tab" data-tab="voy">🧭 5. Călătoria</button>
+    <button role="tab" data-tab="game">🎮 6. Academia</button>
+    <button role="tab" data-tab="prob">🧩 7. Problema zilei</button>
+  </nav>
+
+  <!-- ================= 1. MANEVRE ================= -->
+  <section class="page" id="p-man">
+    <div class="panel">
+      <h2>Înainte de plecare: cum se conduce o corabie mare?</h2>
+      <p>Corăbiile care mergeau în China nu aveau motor. Le mișca doar <b>vântul</b>, prins în pânze. Dar vântul nu bate întotdeauna din direcția potrivită. Marinarii trebuiau să știe trei lucruri: <b>încotro bate vântul</b>, <b>cum se rotesc pânzele</b> și <b>cum se întoarce corabia</b>.</p>
+    </div>
+
+    <div class="panel">
+      <h2>1. Părțile corăbiei</h2>
+      <p class="muted">Apasă pe etichete ca să afli ce face fiecare parte. Rotește corabia cu mouse-ul sau cu degetul, iar cu rotița (sau cu două degete) o apropii.</p>
+      <div class="controls">
+        <label class="field">Corabia: <select id="partsShip"><option value="hindostan">Hindostan (East Indiaman)</option><option value="cutty">Cutty Sark (cliper)</option><option value="madre">Madre de Deus (carracă)</option><option value="keying">Keying (joncă)</option></select></label>
+        <label class="field"><input type="checkbox" id="partsUnder"> vezi și sub apă (chila, cârma)</label>
+      </div>
+      <div class="viewer small" id="v3dParts"></div>
+      <div class="say" id="partInfo1">👆 Apasă pe o etichetă, de exemplu <b>Verga</b> sau <b>Cârma</b>.</div>
+    </div>
+
+    <div class="panel">
+      <h2>2. Corabia și vântul</h2>
+      <p>Trage de corabie ca s-o rotești (sau folosește glisorul). Vântul bate de sus. Apoi <b>rotește vergile</b> (barele de care atârnă pânzele) până se umflă bine pânzele. Marinarii le roteau cu frânghii numite <i>brațe</i> (braces).</p>
+      <div class="stage"><canvas id="cvSail"></canvas></div>
+      <div class="controls">
+        <label class="field">Direcția corăbiei <input type="range" id="sHead" min="0" max="359" value="120"></label>
+        <label class="field">Rotirea vergilor <input type="range" id="sBrace" min="0" max="65" value="10"></label>
+        <label class="field"><input type="checkbox" id="sAuto"> vergi automate</label>
+      </div>
+      <div class="controls">
+        <span class="muted">Încearcă:</span>
+        <button class="btn ghost sm" data-head="0">spre vânt</button>
+        <button class="btn ghost sm" data-head="65">la vânt strâns</button>
+        <button class="btn ghost sm" data-head="90">vânt din lateral</button>
+        <button class="btn ghost sm" data-head="135">vânt larg</button>
+        <button class="btn ghost sm" data-head="180">vânt din spate</button>
+      </div>
+      <div class="readout">
+        <div class="tile"><div class="k">Cursul</div><div class="v" id="sPos">–</div></div>
+        <div class="tile"><div class="k">Viteza</div><div class="v" id="sSpd">–</div></div>
+        <div class="tile"><div class="k">Pânzele</div><div class="v" id="sEff">–</div></div>
+      </div>
+      <div class="say" id="saySail"></div>
+    </div>
+
+    <div class="panel">
+      <h2>3. Cum se întoarce corabia</h2>
+      <p>Ca să meargă spre locul din care bate vântul, corabia merge în <b>zig-zag</b>. La fiecare „zig” trebuie să se întoarcă. Erau două feluri: <b>virarea prin vânt</b> (prova trece prin vânt, e rapidă dar riscantă) și <b>virarea prin pupa</b> (pupa trece prin vânt, e mai sigură dar face o buclă mare).</p>
+      <div class="controls">
+        <button class="btn" data-tack="tack">↪ Virare prin vânt (tacking)</button>
+        <button class="btn warm" data-tack="wear">↩ Virare prin pupa (wearing)</button>
+        <button class="btn ghost" id="tackReplay">↻ Din nou</button>
+      </div>
+      <div class="two">
+        <div class="stage"><canvas id="cvTack"></canvas></div>
+        <ul class="steps" id="tackSteps"></ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>4. Cât de repede mergem? Lochul cu noduri</h2>
+      <p>Marinarii aruncau în apă o scândurică legată de o frânghie cu <b>noduri</b> la distanțe egale. Cât timp curgea nisipul dintr-o clepsidră de 28 de secunde, numărau câte noduri le trec prin mână. Numărul nodurilor era viteza! De aceea viteza navelor se măsoară și azi în <b>noduri</b> (knots).</p>
+      <div class="stage"><canvas id="cvLog"></canvas></div>
+      <div class="controls">
+        <button class="btn" id="logThrow">🪢 Aruncă lochul</button>
+        <label class="field">Am numărat <input type="number" id="logAns" min="0" max="20" style="width:70px"> noduri</label>
+        <button class="btn ghost" id="logCheck">✔ Verifică</button>
+      </div>
+      <div class="say" id="sayLog">Apasă „Aruncă lochul”.</div>
+    </div>
+    <div class="next"><button class="btn" data-goto="ships">Mai departe: corăbiile în 3D ➜</button></div>
+  </section>
+
+  <!-- ================= 2. CORĂBIILE 3D ================= -->
+  <section class="page hidden" id="p-ships">
+    <div class="panel">
+      <h2>Corăbiile adevărate care au mers spre China</h2>
+      <p class="muted">Toate au existat cu adevărat. Alege una și privește-o din toate unghiurile: trage cu mouse-ul (sau cu degetul) ca s-o rotești, iar cu rotița (sau cu două degete) o apropii.</p>
+      <div class="shipcards">
+        <button data-ship="madre" aria-pressed="false"><img data-id="madre" alt=""><b>Madre de Deus</b><small>carracă · 1589</small></button>
+        <button data-ship="hindostan" aria-pressed="false"><img data-id="hindostan" alt=""><b>Hindostan</b><small>East Indiaman · 1789</small></button>
+        <button data-ship="cutty" aria-pressed="true"><img data-id="cutty" alt=""><b>Cutty Sark</b><small>cliper de ceai · 1869</small></button>
+        <button data-ship="keying" aria-pressed="false"><img data-id="keying" alt=""><b>Keying</b><small>joncă · 1846</small></button>
+        <button data-ship="compare" aria-pressed="false" class="cmp"><span>📏</span><b>Compară mărimile</b><small>toate patru + un autobuz</small></button>
+      </div>
+      <div class="viewer" id="v3d"></div>
+      <div class="controls">
+        <label class="field"><input type="checkbox" id="tSails" checked> pânze desfăcute</label>
+        <label class="field"><input type="checkbox" id="tLabels"> denumiri</label>
+        <label class="field"><input type="checkbox" id="tUnder"> sub apă</label>
+        <label class="field"><input type="checkbox" id="tAuto"> rotire automată</label>
+      </div>
+      <div class="controls">
+        <span class="muted">Privește din:</span>
+        <button class="btn ghost sm" data-view="side">lateral</button>
+        <button class="btn ghost sm" data-view="bow">prova (față)</button>
+        <button class="btn ghost sm" data-view="stern">pupa (spate)</button>
+        <button class="btn ghost sm" data-view="top">de sus</button>
+        <button class="btn ghost sm" data-view="deck">de pe punte</button>
+        <button class="btn ghost sm" id="tFull">⛶ ecran complet</button>
+      </div>
+      <div class="say hidden" id="partInfo2"></div>
+    </div>
+    <div class="panel" id="shipInfo"></div>
+    <div class="next"><button class="btn" data-goto="wind">Mai departe: vânturile și curenții ➜</button></div>
+  </section>
+
+  <!-- ================= 3. VÂNTURI ȘI CURENȚI ================= -->
+  <section class="page hidden" id="p-wind">
+    <div class="panel">
+      <h2>Autostrăzile invizibile ale oceanului</h2>
+      <p>Pe ocean vântul nu bate la întâmplare. În fiecare zonă a Pământului bate, aproape mereu, în aceeași direcție. Soarele încălzește mai tare la Ecuator, aerul cald urcă, iar aerul rece vine să-i ia locul. Pământul se rotește și „îndoaie” vânturile. Și apa oceanului curge ca niște râuri uriașe: <b>curenții</b>. Navigatorii au învățat aceste „autostrăzi” și le-au folosit ca să ajungă în China.</p>
+      <div class="controls">
+        <button class="pill dark" id="wTogWind" aria-pressed="true">🌬️ vânturi</button>
+        <button class="pill dark" id="wTogCur" aria-pressed="true">🌊 curenți</button>
+        <button class="pill dark" id="wTogRoute" aria-pressed="false">⛵ drumul corăbiilor</button>
+        <span class="muted">Musonul:</span>
+        <button class="pill dark" data-season="summer" aria-pressed="true">☀️ vara</button>
+        <button class="pill dark" data-season="winter" aria-pressed="false">❄️ iarna</button>
+      </div>
+      <div class="stage map"><canvas id="cvWinds"></canvas></div>
+      <div class="legend"><span><i class="warm"></i> curent cald</span><span><i class="cold"></i> curent rece</span><span class="muted">Firele colorate arată vântul: încotro curg, într-acolo bate vântul.</span></div>
+      <div class="chips" id="windLegend"></div>
+      <div class="say" id="windInfo">👆 Apasă oriunde pe mare ca să afli ce vânt bate acolo, sau pe o săgeată de curent.</div>
+    </div>
+    <div class="panel">
+      <h3>Pe scurt: drumul vânturilor spre China</h3>
+      <ul class="steps">
+        <li><b>Anglia → Madeira:</b> vânturile de vest bat din față; corăbiile ies cu greu din Canalul Mânecii.</li>
+        <li><b>Madeira → Capul Verde:</b> alizeele de nord-est, ajutate de curentul Canarelor, le duc ușor spre sud.</li>
+        <li><b>Ecuatorul:</b> calmele ecuatoriale; trebuie traversate repede, pe la vest.</li>
+        <li><b>Atlanticul de Sud:</b> alizeele de sud-est le împing spre Brazilia, apoi coboară spre sud.</li>
+        <li><b>Sub Africa:</b> „Patruzecile urlătoare” le duc în viteză spre est, departe de curentul Agulhas.</li>
+        <li><b>Oceanul Indian → Sunda:</b> urcă spre nord, pe lângă Australia, până la strâmtoarea Sunda.</li>
+        <li><b>Marea Chinei de Sud:</b> vara, musonul de sud-vest le împinge până în China.</li>
+      </ul>
+    </div>
+    <div class="next"><button class="btn" data-goto="hist">Mai departe: istoria ➜</button></div>
+  </section>
+
+  <!-- ================= 4. ISTORIA ================= -->
+  <section class="page hidden" id="p-hist">
+    <div class="panel">
+      <h2>Scurtă istorie a drumului pe mare spre China</h2>
+      <p class="muted">Derulează cronologia. Corăbiile din imagini sunt modelele 3D din secțiunea 2.</p>
+      <div class="timeline" id="timeline"></div>
+    </div>
+    <div class="panel">
+      <h2>Verifică ce ai aflat</h2>
+      <div id="histQuiz"></div>
+    </div>
+    <div class="next"><button class="btn" data-goto="voy">Mai departe: pornim în călătorie! ➜</button></div>
+  </section>
+
+  <!-- ================= 5. CĂLĂTORIA ================= -->
+  <section class="page hidden" id="p-voy">
+    <div class="panel">
+      <h2 id="vTitle">Călătoria spre China</h2>
+      <p class="muted">Alege corabia și luna plecării, apoi apasă „Pornește”. Pe drum, căpitanul (adică tu!) va lua decizii importante. Traseele și opririle sunt cele adevărate.</p>
+      <div class="shipcards two">
+        <button data-vship="cutty" aria-pressed="true"><img data-id="cutty" alt=""><b>Cutty Sark, 1870</b><small>Londra → Shanghai · fără opriri</small></button>
+        <button data-vship="hindostan" aria-pressed="false"><img data-id="hindostan" alt=""><b>Hindostan, 1792</b><small>Portsmouth → Canton · cu opriri</small></button>
+      </div>
+      <div class="controls">
+        <label class="field">Luna plecării <select id="vMonth"></select></label>
+        <button class="btn" id="vPlay">▶ Pornește</button>
+        <button class="btn ghost" id="vReset">↻ De la capăt</button>
+        <span class="muted">Viteza:</span>
+        <button class="pill dark" data-dps="1" aria-pressed="false">1 zi/s</button>
+        <button class="pill dark" data-dps="3" aria-pressed="true">3 zile/s</button>
+        <button class="pill dark" data-dps="8" aria-pressed="false">8 zile/s</button>
+      </div>
+      <div class="stage map rel"><canvas id="cvVoyage"></canvas>
+        <div class="modal hidden" id="vModal"><div class="box"><h3>🧭 Decizia căpitanului</h3><p class="q"></p><div class="opts"></div></div></div>
+      </div>
+      <div class="meter"><span id="vProg"></span></div>
+      <div class="readout">
+        <div class="tile"><div class="k">Ziua</div><div class="v" id="vDay">0</div></div>
+        <div class="tile"><div class="k">Data</div><div class="v" id="vDate">–</div></div>
+        <div class="tile"><div class="k">Distanța</div><div class="v" id="vDist">0</div><div class="k" id="vKm"></div></div>
+        <div class="tile"><div class="k">Viteza azi</div><div class="v" id="vSpeed">–</div></div>
+        <div class="tile wide"><div class="k">Vântul aici</div><div class="v sm" id="vWind">–</div></div>
+      </div>
+      <div class="say good hidden" id="vEnd"></div>
+    </div>
+    <div class="panel">
+      <h2>📖 Jurnalul de bord</h2>
+      <ul class="log" id="vLog"></ul>
+    </div>
+    <div class="next"><button class="btn" data-goto="game">Mai departe: Academia navigatorilor ➜</button></div>
+  </section>
+
+  <!-- ================= 6. ACADEMIA ================= -->
+  <section class="page hidden" id="p-game">
+    <div class="panel" id="gMenuWrap">
+      <h2>🎓 Academia navigatorilor</h2>
+      <p>Cinci misiuni ca să devii căpitan de cliper. Fiecare misiune se deblochează după cea dinainte. Ai nevoie de mână sigură (cârma și vergile), de atenție și de memorie. Durează cam 20 de minute.</p>
+      <p class="muted">Comenzi: <b>roata cârmei</b> se rotește trăgând cu mouse-ul sau cu degetul în cerc (sau cu tastele ← →). <b>Vergile</b> se reglează cu glisorul (sau cu tastele ↑ ↓).</p>
+      <div class="levels" id="gMenu"></div>
+      <h3>Insignele tale</h3>
+      <div id="gBadges"></div>
+    </div>
+    <div class="panel hidden" id="gPlay">
+      <div class="gbar"><h2 id="gTitle">Misiunea</h2><button class="btn ghost sm gBack">☰ Misiunile</button></div>
+      <div class="gwrap">
+        <div class="stage rel"><canvas id="cvGame"></canvas><div class="gmsg hidden" id="gMsg"></div><div class="gwin hidden" id="gWin"></div></div>
+        <div class="gctl">
+          <div class="wheelbox"><canvas id="cvWheel"></canvas><div class="muted">roata cârmei</div><button class="btn ghost sm" id="gCenter">⊙ cârma la mijloc</button></div>
+          <div class="bracebox"><label>Vergile<br><input type="range" id="gBrace" min="0" max="65" value="30" orient="vertical"></label><div class="muted">↑ mai rotite<br>↓ drepte</div></div>
+          <label class="field"><input type="checkbox" id="gHint" checked> sfaturi pentru vergi</label>
+          <div class="controls"><button class="btn ghost sm" id="gPause">⏸ Pauză</button><button class="btn ghost sm" id="gRestart">↻ Restart</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel hidden" id="gFlags">
+      <div class="gbar"><h2>🚩 Misiunea 4: Semnalele cu steaguri</h2><span class="muted" id="flagRound"></span><button class="btn ghost sm gBack">☰ Misiunile</button></div>
+      <p id="flagInfo"></p>
+      <div id="flagArea"></div>
+      <div class="say" id="flagSay"></div>
+    </div>
+    <div class="hidden" id="gSea"></div>
+    <div class="next"><button class="btn" data-goto="prob">Mai departe: problema zilei ➜</button></div>
+  </section>
+
+  <!-- ================= 7. PROBLEMA ZILEI ================= -->
+  <section class="page hidden" id="p-prob">
+    <div class="panel">
+      <h2>🧩 Problema zilei <small class="muted">· în stilul concursului Cangurul</small></h2>
+      <div id="p1pic" class="probpic"></div>
+      <p class="qtext">În portul Canton sunt ancorate <b>12 corăbii</b>: clipere englezești și joncuri chinezești. Fiecare <b>cliper are 3 catarge</b>, iar fiecare <b>joncă are 2 catarge</b>. Marinarul din gabie numără în total <b>31 de catarge</b>.<br><b>Câte clipere sunt în port?</b></p>
+      <div class="mc" id="p1opts"></div>
+      <div class="say" id="p1fb"></div>
+      <div class="controls"><button class="btn ghost" id="p1hint">💡 Un ajutor (1/3)</button></div>
+      <ol class="hints" id="p1hints"></ol>
+      <div class="lab hidden" id="p1lab"><h3>Laboratorul de corăbii</h3><div class="boats"></div><p class="sum"></p></div>
+      <div class="say good hidden" id="p1sol"><b>Cum gândim:</b> Dacă toate 12 ar fi joncuri, ar fi 12 × 2 = <b>24</b> de catarge. Marinarul a numărat 31, adică <b>7 în plus</b>. Fiecare joncă înlocuită cu un cliper aduce <b>1 catarg în plus</b>. Deci sunt <b>7 clipere</b> și 12 − 7 = <b>5 joncuri</b>. Verificare: 21 + 10 = 31. ✔</div>
+    </div>
+
+    <div class="panel">
+      <h2>🧩 Problema de rezervă <small class="muted">· mai grea</small></h2>
+      <p class="qtext">O corabie trebuie să urce <b>6 rânduri</b> printr-un canal îngust, până la portul aflat drept în față. Vântul bate exact dinspre port, așa că la fiecare rând corabia se mută <b>în diagonală</b>: un rând în sus și o coloană la stânga sau la dreapta. Canalul are doar <b>3 coloane</b>: pe margini sunt stânci. Corabia pornește din coloana din mijloc, iar portul este tot în coloana din mijloc.<br><b>De câte ori, cel mai puțin, trebuie corabia să-și schimbe direcția (să vireze)?</b></p>
+      <div class="two">
+        <div class="board"><svg id="p2board"></svg>
+          <div class="controls"><button class="btn" id="p2L">↖ stânga-sus</button><button class="btn" id="p2R">↗ dreapta-sus</button><button class="btn ghost sm" id="p2U">↶ anulează</button><button class="btn ghost sm" id="p2X">✖ de la capăt</button></div>
+          <p id="p2stat" class="muted"></p><div class="say" id="p2fb"></div>
+        </div>
+        <div>
+          <div class="mc" id="p2opts"></div>
+          <div class="say" id="p2fb2"></div>
+          <div class="controls"><button class="btn ghost" id="p2hint">💡 Un ajutor (1/3)</button></div>
+          <ol class="hints" id="p2hints"></ol>
+          <div class="say good hidden" id="p2sol"><b>Cum gândim:</b> Din mijloc, primul pas te duce lângă stânci, deci primul „bord” are doar <b>1 pas</b>. După aceea poți merge cel mult <b>2 pași</b> la rând (de la o margine la cealaltă). Cu 3 borduri faci cel mult 1 + 2 + 2 = 5 pași, prea puțin. Ai nevoie de 4 borduri: 1 + 2 + 2 + 1 = 6 pași, adică <b>3 virări</b>. Exemplu: dreapta · stânga, stânga · dreapta, dreapta · stânga. Așa făceau și corăbiile adevărate în canalele înguste: virau des!</div>
+        </div>
+      </div>
+    </div>
+    <details class="panel teacher"><summary>👩‍🏫 Pentru profesor</summary>
+      <p><b>Problema zilei:</b> răspuns C (7 clipere). Metoda „presupunem că toate sunt de același fel”, ca la problema cu monștrii (ochi/picioare) din Primary Kangaroo 2026. Laboratorul de corăbii apare la al treilea ajutor, pentru încercare și verificare.</p>
+      <p><b>Rezerva:</b> răspuns C (3 virări). Raționament despre limite: fiecare bord are cel mult 2 pași, iar primul doar 1. Tabla permite încercarea directă. Extensie: dacă urcă 8 rânduri? (1+2+2+2+1 = 8 → 4 virări).</p>
+    </details>
+  </section>
+</div>
+
+<footer class="bot">Corăbii spre China · aplicație pentru Eva · Beldu, 2026 · Modelele 3D sunt reconstituiri după desene și descrieri istorice; cifrele sunt aproximative.</footer>
+
+<script src="assets/js/app.js?v=1"></script>
+</body>
+</html>

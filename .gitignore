@@ -1,0 +1,15 @@
+# sistem
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# editoare
+.vscode/
+.idea/
+*.swp
+
+# arhive și temporare
+*.zip
+*.tmp
+*~
+node_modules/
