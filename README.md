@@ -4,13 +4,14 @@ Aplicație interactivă pentru Eva (8 ani, sistemul britanic, Year 4): **marele 
 
 Pagina live: https://beldugan.github.io/corabii-spre-china/
 
-## Cele șapte secțiuni
+## Cele opt secțiuni
 
 | Secțiunea | Ce face copilul | Ce învață |
 |---|---|---|
 | ⚓ **1. Cum se conduce** | Corabie 3D cu etichete pe care se apasă (catarg, vergă, cârmă, wanturi, ancoră, cabestan…) · rotește corabia față de vânt și reglează vergile · animația virării prin vânt și prin pupa, cu comenzile reale RO/EN · lochul cu noduri: numără nodurile cât curge clepsidra | cursurile față de vânt, zona „în vânt”, brațarea vergilor, zig-zagul, de unde vine „nodul” |
 | 🚢 **2. Corăbiile 3D** | 4 corăbii reale, modelate în 3D, rotite din toate unghiurile: **Madre de Deus** (carracă, 1589), **Hindostan** (East Indiaman, 1789), **Cutty Sark** (cliper, 1869), **Keying** (joncă, 1846) · pânze sus/strânse, denumiri, sub apă, vedere de pe punte, ecran complet · **interiorul**: tăiere în secțiune, intrare prin chilă, cala cu lăzi de ceai / porțelan / mirodenii, puntea tunurilor cu hamace, cabina căpitanului, pompe, coaste, balast, pereții etanși ai joncii, deplasare cu W A S D · comparația mărimilor cu un autobuz londonez și cu Eva | tipurile de corăbii, cum au evoluat, date reale |
-| 🌬️ **3. Vânturi și curenți** | Hartă Mercator animată: vânturile (alizee, calmele ecuatoriale, Patruzecile urlătoare, musonul vara/iarna) și 13 curenți oceanici, calzi și reci · se apasă pe hartă pentru explicații | circulația atmosferică și oceanică, de ce drumul face ocolul prin vest |
+| 🔧 **3. Forțele pe corabie** | Secțiune transversală animată (Hindostan, 1.200 t): vântul pe scara Beaufort, pânze strânse sau nu, balast, valuri · se văd greutatea (G), împingerea apei (B), brațul de redresare, presiunea apei pe corp, wanturile întinse/slăbite, compresiunea catargului până în chilă, răsturnarea · corabia pe val (cocoașă / șa) · construcția catargului în 9 pași (cep în lăcaș, parteneri și pene, catarg din bucăți cu cercuri de fier, cuiul gabierului, ochii de lemn, lanțuri, straiuri) · de ce triunghiuri · experimente acasă + quiz | întindere, compresiune, încovoiere, presiunea apei, stabilitate, pârghie, scripete, structuri triunghiulare |
+| 🌬️ **4. Vânturi și curenți** | Hartă Mercator animată: vânturile (alizee, calmele ecuatoriale, Patruzecile urlătoare, musonul vara/iarna) și 13 curenți oceanici, calzi și reci · se apasă pe hartă pentru explicații | circulația atmosferică și oceanică, de ce drumul face ocolul prin vest |
 | 📜 **4. Istoria** | Cronologie 1405–azi (Zheng He, Vasco da Gama, Compania Indiilor de Est, Macartney, cursa ceaiului din 1866, Cutty Sark) + quiz | istoria comerțului pe mare cu China |
 | 🧭 **5. Călătoria** | Simularea zi cu zi pe harta reală: Cutty Sark (Londra → Shanghai, 1870) sau Hindostan (Portsmouth → Canton, 1792, cu opririle reale) · luna plecării schimbă musonul · 3 decizii ale căpitanului · jurnal de bord | distanțe, timp, calendar, mile marine/km, consecințele deciziilor |
 | 🎮 **6. Academia navigatorilor** | 5 misiuni (~20 min): butoaiele (reglarea pânzelor), geamandurile din ceață (doar busola), intrarea în port (zig-zag printre stânci), semnalele cu steaguri (memorie + cod), marea cursă a ceaiului contra cliperului Taeping | motricitate fină (roata cârmei trasă în cerc, glisorul, drag & drop), orientare, planificare, memorie de lucru |

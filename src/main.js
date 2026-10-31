@@ -7,6 +7,7 @@ import { initVoyage } from './voyage.js';
 import { initHistory } from './history.js';
 import { initGame } from './game.js';
 import { initProblem } from './problem.js';
+import { initForces } from './forces.js';
 import { refresh } from './progress.js';
 
 const $ = s => document.querySelector(s);
@@ -65,6 +66,7 @@ const INIT = {
     show('cutty'); v.start();
     root.querySelectorAll('[data-ship] img').forEach(img => getThumb(img.dataset.id).then(u => { if (u) img.src = u; }));
   },
+  forte(root) { initForces(root); },
   wind(root) { initWinds(root); },
   hist(root) { initHistory(root, getThumb); },
   voy(root) { initVoyage(root, getThumb); },

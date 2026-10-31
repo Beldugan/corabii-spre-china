@@ -161,3 +161,12 @@ details.teacher summary { cursor: pointer; font-weight: 700; }
 .vin.min > :not(.vin-h):not(.vin-toggle) { display: none !important; }
 .vin.min .vin-toggle { transform: rotate(180deg); }
 @media (max-width: 620px) { .vin { width: 200px; font-size: .78rem; } }
+
+/* forțele pe corabie */
+.tens { color: #2563eb; font-weight: 700; } .comp { color: #dc2626; font-weight: 700; }
+.legend i.tensl { background: #2563eb; } .legend i.compl { background: #dc2626; } .legend i.pressl { background: #93c5fd; }
+.tile.tens { border-color: #93c5fd; } .tile.comp { border-color: #fca5a5; }
+.chip[aria-pressed="true"] { background: #fde68a; border-color: #b7791f; color: #422; }
+.mtext h3 { margin: 0 0 6px; }
+.mtext .why { background: #fff7e0; color: #422; padding: 8px 10px; border-radius: 8px; }
+#mSteps li { cursor: pointer; }

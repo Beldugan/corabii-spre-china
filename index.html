@@ -7,7 +7,7 @@
 <meta name="description" content="Aplicație interactivă pentru copii: cum se conducea o corabie cu pânze, corăbiile reale care au mers în China (în 3D), vânturile și curenții, istoria expedițiilor, simularea călătoriei de la Londra la China, jocuri de navigație și problema zilei.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛵</text></svg>">
 <link rel="stylesheet" href="assets/css/style.css?v=1">
-<link rel="stylesheet" href="assets/css/corabii.css?v=3">
+<link rel="stylesheet" href="assets/css/corabii.css?v=4">
 </head>
 <body>
 
@@ -26,11 +26,12 @@
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="man" aria-selected="true">⚓ 1. Cum se conduce</button>
     <button role="tab" data-tab="ships">🚢 2. Corăbiile 3D</button>
-    <button role="tab" data-tab="wind">🌬️ 3. Vânturi și curenți</button>
-    <button role="tab" data-tab="hist">📜 4. Istoria</button>
-    <button role="tab" data-tab="voy">🧭 5. Călătoria</button>
-    <button role="tab" data-tab="game">🎮 6. Academia</button>
-    <button role="tab" data-tab="prob">🧩 7. Problema zilei</button>
+    <button role="tab" data-tab="forte">🔧 3. Forțele pe corabie</button>
+    <button role="tab" data-tab="wind">🌬️ 4. Vânturi și curenți</button>
+    <button role="tab" data-tab="hist">📜 5. Istoria</button>
+    <button role="tab" data-tab="voy">🧭 6. Călătoria</button>
+    <button role="tab" data-tab="game">🎮 7. Academia</button>
+    <button role="tab" data-tab="prob">🧩 8. Problema zilei</button>
   </nav>
 
   <!-- ================= 1. MANEVRE ================= -->
@@ -135,6 +136,112 @@
       <div class="say hidden" id="partInfo2"></div>
     </div>
     <div class="panel" id="shipInfo"></div>
+    <div class="next"><button class="btn" data-goto="forte">Mai departe: forțele pe corabie ➜</button></div>
+  </section>
+
+  <!-- ================= 3. FORȚELE PE CORABIE ================= -->
+  <section class="page hidden" id="p-forte">
+    <div class="panel">
+      <h2>🔧 Forțele pe corabie: ce simte fiecare piesă?</h2>
+      <p>O corabie e o <b>structură</b>, ca un pod sau o clădire, doar că plutește și se mișcă. Asupra ei apasă <b>greutatea</b>, <b>apa</b>, <b>vântul</b> și <b>valurile</b>. Inginerii spun că piesele sunt <b>solicitate</b>: unele sunt trase (<span class="tens">întindere</span>), altele sunt apăsate (<span class="comp">compresiune</span>), iar altele se îndoaie (<b>încovoiere</b>).</p>
+      <div class="legend"><span><i class="tensl"></i> întindere: frânghia trage</span><span><i class="compl"></i> compresiune: lemnul e apăsat</span><span><i class="pressl"></i> presiunea apei</span><span>🔴 G greutatea · 🟢 B împingerea apei</span></div>
+    </div>
+
+    <div class="panel">
+      <h2>1. Corabia văzută din spate, pe vânt</h2>
+      <p class="muted">O corabie ca „Hindostan” (1.200 de tone), tăiată prin mijloc. Mărește vântul și privește ce se întâmplă cu wanturile, catargul și înclinarea. Apoi încearcă furtuna: o dată cu toate pânzele, o dată cu pânzele strânse.</p>
+      <div class="controls">
+        <span class="muted">Situații:</span>
+        <button class="btn ghost sm" data-scen="port">⚓ În port</button>
+        <button class="btn ghost sm" data-scen="briza">🌤 Briză</button>
+        <button class="btn ghost sm" data-scen="tare">💨 Vânt puternic</button>
+        <button class="btn warm sm" data-scen="furtuna">⛈ Furtună cu toate pânzele</button>
+        <button class="btn sm" data-scen="strans">⛈ Furtună cu pânzele strânse</button>
+        <button class="btn ghost sm" data-scen="pupa">⬆ Vânt din spate</button>
+      </div>
+      <div class="stage"><canvas id="cvForce"></canvas></div>
+      <div class="controls">
+        <label class="field">Vântul (scara Beaufort) <input type="range" id="fWind" min="0" max="11" value="0"></label>
+        <label class="field"><input type="checkbox" id="fWaves"> valuri</label>
+        <label class="field"><input type="checkbox" id="fPress" checked> presiunea apei</label>
+        <label class="field"><input type="checkbox" id="fExag"> arată îndoirea catargului mărită</label>
+        <button class="btn ghost sm" id="fReset">↻ De la capăt</button>
+      </div>
+      <div class="controls">
+        <span class="muted">Pânzele:</span>
+        <button class="pill dark" data-fsails data-v="all" aria-pressed="true">toate</button>
+        <button class="pill dark" data-fsails data-v="top" aria-pressed="false">fără cele de sus</button>
+        <button class="pill dark" data-fsails data-v="reef" aria-pressed="false">strânse (terțarol)</button>
+        <button class="pill dark" data-fsails data-v="bare" aria-pressed="false">fără pânze</button>
+        <span class="muted">Vântul vine:</span>
+        <button class="pill dark" data-fdir data-v="side" aria-pressed="true">din lateral</button>
+        <button class="pill dark" data-fdir data-v="back" aria-pressed="false">din spate</button>
+        <span class="muted">Balast:</span>
+        <button class="pill dark" data-fball data-v="little" aria-pressed="false">puțin</button>
+        <button class="pill dark" data-fball data-v="normal" aria-pressed="true">normal</button>
+        <button class="pill dark" data-fball data-v="much" aria-pressed="false">mult</button>
+      </div>
+      <div class="readout">
+        <div class="tile"><div class="k">Vântul</div><div class="v sm" id="fV">–</div></div>
+        <div class="tile"><div class="k">Forța pe pânze</div><div class="v" id="fF">–</div><div class="k" id="fFc"></div></div>
+        <div class="tile"><div class="k">Înclinarea</div><div class="v" id="fHeel">–</div></div>
+        <div class="tile tens"><div class="k">Wanturile din vânt</div><div class="v" id="fTw">–</div></div>
+        <div class="tile"><div class="k">Wanturile de sub vânt</div><div class="v" id="fTl">–</div></div>
+        <div class="tile comp"><div class="k">Catargul apasă pe chilă</div><div class="v" id="fC">–</div></div>
+        <div class="tile"><div class="k">Apa, la chilă</div><div class="v" id="fP">–</div></div>
+      </div>
+      <div class="say" id="fSay"></div>
+      <h3>Ce face fiecare piesă? <span class="muted">(apasă: piesa se aprinde pe desen)</span></h3>
+      <div class="chips" id="fParts"></div>
+      <div class="say" id="fPartInfo">👆 Alege o piesă.</div>
+    </div>
+
+    <div class="panel">
+      <h2>2. Corabia pe valuri: cocoașă și șa</h2>
+      <p class="muted">Valul trece pe sub corabie. Când creasta e la mijloc, capetele atârnă; când crestele sunt la capete, atârnă mijlocul. Corpul se îndoaie, iar puntea și chila sunt pe rând trase și apăsate.</p>
+      <div class="stage"><canvas id="cvBend"></canvas></div>
+      <div class="controls">
+        <button class="btn" id="bRun">⏸ Oprește valul</button>
+        <button class="btn ghost sm" data-bpos="crest">creasta la mijloc</button>
+        <button class="btn ghost sm" data-bpos="trough">golul la mijloc</button>
+        <label class="field">Înălțimea valului <input type="range" id="bH" min="0" max="8" step="0.5" value="3"> m</label>
+      </div>
+      <div class="say" id="bSay"></div>
+    </div>
+
+    <div class="panel">
+      <h2>3. Cum se fixează și cum se ține catargul</h2>
+      <p class="muted">Construiește catargul pas cu pas: cu ce se leagă, cum se leagă și de ce.</p>
+      <div class="two">
+        <div class="stage"><canvas id="cvMast"></canvas></div>
+        <div><div id="mText" class="mtext"></div>
+          <div class="controls"><button class="btn ghost sm" id="mPrev">◀ Înapoi</button><button class="btn sm" id="mNext">Înainte ▶</button><button class="btn warm sm" id="mAuto">▶ Arată tot</button></div>
+          <ul class="steps" id="mSteps"></ul></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>4. De ce sunt peste tot triunghiuri?</h2>
+      <p class="muted">Bețele sunt prinse cu cuie în colțuri, care se pot roti (ca la o corabie veche, unde îmbinările nu sunt perfect rigide). Împinge de sus și compară.</p>
+      <div class="stage"><canvas id="cvTri"></canvas></div>
+      <div class="controls">
+        <label class="field">Împinge <input type="range" id="triPush" min="0" max="100" value="0"></label>
+        <label class="field"><input type="checkbox" id="triDiag"> pune o diagonală în pătrat (ca un genunchi sau un want)</label>
+      </div>
+      <div class="say">Pe corabie, triunghiurile sunt peste tot: <b>wanturile + catargul + puntea</b>, <b>straiurile</b>, <b>genunchii</b> de la capetele grinzilor. La fel la poduri, macarale și acoperișuri.</div>
+    </div>
+
+    <div class="panel">
+      <h2>🔬 Experimente de făcut acasă</h2>
+      <ul class="steps">
+        <li><b>Catargul din pai:</b> înfige un pai într-o bucată de plastilină pe o tavă și leagă-l cu 4 ațe (wanturi și straiuri) de 4 bolduri. Suflă din lateral sau cu uscătorul de păr la treapta rece. Ce ață se întinde? Taie una: ce se întâmplă?</li>
+        <li><b>Presiunea apei:</b> fă 3 găuri, una deasupra alteia, într-o sticlă de plastic și umple-o cu apă (deasupra chiuvetei). Din care gaură țâșnește apa cel mai departe? Asta simte corabia la chilă.</li>
+        <li><b>Balastul:</b> pune o bilă de plastilină pe fundul unei cutii de iaurt care plutește, apoi lipește-o sus, pe margine. Împinge cutia lateral cu degetul: când se răstoarnă mai ușor?</li>
+        <li><b>Triunghiul:</b> 4 paie prinse cu agrafe de birou formează un pătrat care se strâmbă. Adaugă un pai pe diagonală: ce se schimbă?</li>
+      </ul>
+    </div>
+
+    <div class="panel"><h2>Verifică ce ai aflat</h2><div id="fQuiz"></div></div>
     <div class="next"><button class="btn" data-goto="wind">Mai departe: vânturile și curenții ➜</button></div>
   </section>
 
@@ -295,6 +402,6 @@
 
 <footer class="bot">Corăbii spre China · aplicație pentru Eva · Beldu, 2026 · Modelele 3D sunt reconstituiri după desene și descrieri istorice; cifrele sunt aproximative.</footer>
 
-<script src="assets/js/app.js?v=3"></script>
+<script src="assets/js/app.js?v=4"></script>
 </body>
 </html>
