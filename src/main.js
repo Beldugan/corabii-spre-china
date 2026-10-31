@@ -66,7 +66,7 @@ const INIT = {
     show('cutty'); v.start();
     root.querySelectorAll('[data-ship] img').forEach(img => getThumb(img.dataset.id).then(u => { if (u) img.src = u; }));
   },
-  forte(root) { initForces(root); },
+  forte(root) { viewers.forte = initForces(root); },
   wind(root) { initWinds(root); },
   hist(root) { initHistory(root, getThumb); },
   voy(root) { initVoyage(root, getThumb); },
@@ -77,7 +77,7 @@ const INIT = {
 function openTab(key) {
   document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === key));
   document.querySelectorAll('section.page').forEach(s => s.classList.toggle('hidden', s.id !== 'p-' + key));
-  for (const k in viewers) { if ((k === 'parts' && key === 'man') || (k === 'ships' && key === 'ships')) { viewers[k].resize(); viewers[k].start(); } else viewers[k].stop(); }
+  for (const k in viewers) { if ((k === 'parts' && key === 'man') || (k === 'ships' && key === 'ships') || (k === 'forte' && key === 'forte')) { viewers[k].resize(); viewers[k].start(); } else viewers[k].stop(); }
   const root = $('#p-' + key);
   if (!inited[key]) { inited[key] = true; try { INIT[key](root); } catch (e) { console.error(e); root.insertAdjacentHTML('afterbegin', `<p class="say warn">Această secțiune nu a putut porni pe acest dispozitiv (${e.message}).</p>`); } }
   try { history.replaceState(null, '', '#' + key); } catch (e) { /* */ }

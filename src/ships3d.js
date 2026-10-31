@@ -437,7 +437,7 @@ export function buildShip(id) {
   }
 
   // catargele
-  const mastTops = [], yardInfo = [];
+  const mastTops = [], yardInfo = [], rig = { feet: { '-1': [], '1': [] }, top: {} };
   S.masts.forEach((mDef, mi) => {
     const mg = new THREE.Group();
     const mx = tx(mDef.t), baseY = deckH(mDef.t) - bw;
@@ -490,6 +490,7 @@ export function buildShip(id) {
         const s = squareSail(yd.w * 0.93, wBot, h, 1, M.sail(yd.cross ? 'cross' : S.sailKind || 'std'));
         s.position.y = -0.25; yg.add(s); sails.push(s);
         const f = cyl(0.35, 0.35, yd.w * 0.85, M.furled(), 8); f.rotation.x = PI / 2; f.position.y = -0.35; f.visible = false; yg.add(f); furled.push(f);
+        s.userData.sq = k; s.userData.furl = f;
         if (mi === S.mainIndex && k === 0) { anchors.verga = toShip(yd.h + 0.4, yd.w / 2 - 0.5); }
         if (mi === S.mainIndex && k === 1) { anchors.panza = toShip(yd.h - h * 0.5, 0, 1.0); }
       }
@@ -526,6 +527,7 @@ export function buildShip(id) {
         for (let i = 0; i < n - 1; i++) seg(feet[i].clone().lerp(top, f), feet[i + 1].clone().lerp(top, f));
       }
       if (mi === S.mainIndex && s === 1) anchors.wanturi = feet[2].clone().lerp(top, 0.45);
+      if (mi === S.mainIndex) { rig.top[s] = top.clone(); rig.feet[s] = feet.map(f => f.clone()); rig.mx = mx; rig.chainY = chainY; rig.chainZ = chainZ; }
       // wanturile gabierului (de la catargul 2 la marginea gabiei)
       if (heads.length > 1) {
         const t2 = toShip(heads[1] - 1.6, s * 0.3);
@@ -560,7 +562,7 @@ export function buildShip(id) {
       const yg = new THREE.Group(); yg.position.copy(p); ship.add(yg);
       const yc = cyl(0.12, 0.2, bowsprit.sprit.w, M.mast(S.mastColor), 6); yc.rotation.x = PI / 2; yc.position.y = -0.6; yg.add(yc);
       const s = squareSail(bowsprit.sprit.w * 0.9, bowsprit.sprit.w, bowsprit.sprit.h, 0.8, M.sail(S.sailKind || 'std'));
-      s.position.y = -0.8; yg.add(s); sails.push(s);
+      s.position.y = -0.8; yg.add(s); sails.push(s); s.userData.sq = 0;
       const f = cyl(0.3, 0.3, bowsprit.sprit.w * 0.8, M.furled(), 8); f.rotation.x = PI / 2; f.position.y = -0.9; f.visible = false; yg.add(f); furled.push(f);
     }
   }
@@ -856,6 +858,9 @@ export function buildShip(id) {
 
   ship.userData = { id, sails, furled, flags, anchors, length: L + (bowsprit ? bowsprit.len * Math.cos(bowsprit.angle * PI / 180) : 0), hull: S.hull, height: Math.max(...mastTops.map(m => m.baseY + m.heads[m.heads.length - 1])) };
   ship.userData.inside = inside;
+  ship.userData.hullFns = { zAt, deckH, keelY: hullO.keelY, L, bw };
+  rig.mastTop = mastTops[S.mainIndex].toShip(mastTops[S.mainIndex].heads[mastTops[S.mainIndex].heads.length - 1]);
+  rig.topY = mastTops[S.mainIndex].baseY + mastTops[S.mainIndex].heads[0]; ship.userData.rig = rig;
   ship.traverse(o => {
     if (o.isMesh && !o.userData.noShadow) o.castShadow = true;
     if ((o.isMesh || o.isLine || o.isInstancedMesh) && !o.userData.noClip) {
@@ -1282,10 +1287,10 @@ function makeWater() {
   const geo = new THREE.PlaneGeometry(3000, 3000, 220, 220); geo.rotateX(-PI / 2);
   const m = new THREE.ShaderMaterial({
     transparent: true,
-    uniforms: { uTime: { value: 0 }, uOpacity: { value: 0.96 }, uSun: { value: new THREE.Vector3(0.5, 0.7, 0.3).normalize() }, uFogColor: { value: new THREE.Color(0xc9dcea) } },
+    uniforms: { uTime: { value: 0 }, uAmp: { value: 1 }, uOpacity: { value: 0.96 }, uSun: { value: new THREE.Vector3(0.5, 0.7, 0.3).normalize() }, uFogColor: { value: new THREE.Color(0xc9dcea) } },
     vertexShader: `
-      uniform float uTime; varying vec3 vW; varying vec3 vN;
-      float h(vec2 p){ return 0.28*sin(p.x*0.11+uTime*0.9)+0.22*sin(p.y*0.13+uTime*1.1)+0.12*sin((p.x+p.y)*0.27+uTime*1.7)+0.06*sin((p.x-p.y)*0.6+uTime*2.3); }
+      uniform float uTime; uniform float uAmp; varying vec3 vW; varying vec3 vN;
+      float h(vec2 p){ return uAmp*(0.28*sin(p.x*0.11+uTime*0.9)+0.22*sin(p.y*0.13+uTime*1.1)+0.12*sin((p.x+p.y)*0.27+uTime*1.7)+0.06*sin((p.x-p.y)*0.6+uTime*2.3)); }
       void main(){ vec3 p = position; float d = length(p.xz); float k = smoothstep(900.0, 300.0, d); p.y += h(p.xz)*k;
         float e=0.5; float hx=(h(p.xz+vec2(e,0.))-h(p.xz-vec2(e,0.)))/(2.*e)*k; float hz=(h(p.xz+vec2(0.,e))-h(p.xz-vec2(0.,e)))/(2.*e)*k;
         vN = normalize(vec3(-hx,1.0,-hz)); vec4 w = modelMatrix*vec4(p,1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
@@ -1341,7 +1346,7 @@ export class ShipViewer {
   constructor(el, opts = {}) {
     this.el = el; this.opts = opts;
     const W = el.clientWidth || 800, Hh = el.clientHeight || 480;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: !!opts.thumbs });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: !!opts.alpha, preserveDrawingBuffer: !!opts.thumbs });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.setSize(W, Hh);
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1382,7 +1387,7 @@ export class ShipViewer {
     el.appendChild(info); this.infoBox = info;
     const onFs = () => { const on = (document.fullscreenElement || document.webkitFullscreenElement) === el; fs.textContent = on ? '✕ Ieși din ecran complet' : '⛶ Ecran complet'; el.classList.toggle('isfull', on); setTimeout(() => this.resize(), 60); };
     document.addEventListener('fullscreenchange', onFs); document.addEventListener('webkitfullscreenchange', onFs);
-    if (!opts.thumbs) this.makeInteriorUI();
+    if (!opts.thumbs && !opts.noInteriorUI) this.makeInteriorUI();
   }
   // ---------------- vizita în interior
   makeInteriorUI() {
@@ -1470,6 +1475,7 @@ export class ShipViewer {
     });
   }
   applyClip() {
+    if (this.fixedClip) { CLIP_PLANE.normal.copy(this.fixedClip.n); CLIP_PLANE.constant = this.fixedClip.c; return; }
     if (this.cut <= 0.001 || this.compare || !this.current) { CLIP_PLANE.constant = 1e4; return; }
     const d = this.camera.position.clone().sub(this.controls.target); d.y = 0; if (d.lengthSq() < 1e-6) d.set(0, 0, 1); d.normalize();
     const B = this.current.userData.hull.B;
@@ -1574,7 +1580,7 @@ export class ShipViewer {
       for (const id in this.ships) {
         const s = this.ships[id]; if (!s.parent) continue;
         const calm = this.insideMode ? 0.25 : 1; // înăuntru legănăm mai puțin, să nu amețim
-        s.rotation.z = Math.sin(t * 0.6 + s.position.x) * 0.006 * calm; s.rotation.x = Math.sin(t * 0.8 + s.position.x) * 0.012 * calm; s.position.y = Math.sin(t * 0.9) * 0.12 * calm;
+        s.rotation.z = Math.sin(t * 0.6 + s.position.x) * 0.006 * calm; s.rotation.x = (s.userData.roll || 0) + Math.sin(t * 0.8 + s.position.x) * 0.012 * calm * (s.userData.noBob ? 0 : 1); s.position.y = Math.sin(t * 0.9) * 0.12 * calm;
         for (const f of s.userData.flags) {
           const p = f.geometry.attributes.position, b = f.userData.base;
           for (let i = 0; i < p.count; i++) { const x = b[i * 3]; p.setZ(i, Math.sin(x * 1.3 - t * 6) * 0.25 * (-x / f.userData.w)); }
@@ -1594,6 +1600,30 @@ export class ShipViewer {
     loop();
   }
   stop() { this.running = false; cancelAnimationFrame(this.raf); }
+  sideImage(id, pxPerM = 22) { // imagine laterală a corăbiei, fără cer și apă (fundal transparent)
+    const s = this.getShip(id), keepCur = this.current, keepParent = s.parent;
+    const others = []; this.scene.children.forEach(o => { if (o !== s && o.visible && !o.isLight) { others.push(o); o.visible = false; } });
+    if (!s.parent) this.scene.add(s);
+    const rx = s.rotation.x, rz = s.rotation.z, py = s.position.y, px = s.position.x; s.rotation.set(0, 0, 0); s.position.set(0, 0, 0); s.updateMatrixWorld(true);
+    const keepClip = CLIP_PLANE.constant; CLIP_PLANE.constant = 1e4;
+    (s.userData.lights || []).forEach(l => l.visible = false);
+    const box = new THREE.Box3().setFromObject(s);
+    const x0 = box.min.x - 1, x1 = box.max.x + 1, y0 = box.min.y - 1, y1 = box.max.y + 1;
+    const w = Math.round((x1 - x0) * pxPerM), h = Math.round((y1 - y0) * pxPerM);
+    const cam = new THREE.OrthographicCamera(x0, x1, y1, y0, 1, 1000); cam.position.set(0, 0, 300); cam.lookAt(0, 0, 0);
+    const keepSize = this.renderer.getSize(new THREE.Vector2()), keepPR = this.renderer.getPixelRatio();
+    this.renderer.setPixelRatio(1); this.renderer.setSize(w, h, false); this.renderer.setClearColor(0x000000, 0);
+    const keepSh = this.sun.position.clone(); this.sun.position.set(30, 120, 160);
+    this.renderer.render(this.scene, cam);
+    const url = this.renderer.domElement.toDataURL('image/png');
+    this.sun.position.copy(keepSh);
+    this.renderer.setPixelRatio(keepPR); this.renderer.setSize(keepSize.x, keepSize.y, false); this.resize();
+    others.forEach(o => o.visible = true); s.rotation.x = rx; s.rotation.z = rz; s.position.y = py; s.position.x = px;
+    if (!keepParent) this.scene.remove(s);
+    CLIP_PLANE.constant = keepClip;
+    if (keepCur) (keepCur.userData.lights || []).forEach(l => l.visible = true);
+    return { url, x0, x1, y0, y1, w, h };
+  }
   snapshot(id, w = 360, h = 220) { // imagine fixă a unei corăbii (pentru cronologie și alegerea corăbiei)
     const keep = { sz: this.renderer.getSize(new THREE.Vector2()), cam: this.camera.position.clone(), tgt: this.controls.target.clone(), cur: this.current ? this.current.name : null, cmp: this.compare };
     this.setShip(id);

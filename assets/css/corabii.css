@@ -170,3 +170,9 @@ details.teacher summary { cursor: pointer; font-weight: 700; }
 .mtext h3 { margin: 0 0 6px; }
 .mtext .why { background: #fff7e0; color: #422; padding: 8px 10px; border-radius: 8px; }
 #mSteps li { cursor: pointer; }
+
+.force3d { position: relative; width: 100%; height: 660px; border-radius: var(--radius); overflow: hidden; background: #9cc1da; margin-top: 10px; touch-action: none; }
+.force3d > canvas:first-child { width: 100% !important; height: 100% !important; }
+.force3d canvas.ov { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
+.force3d:fullscreen { height: 100vh; border-radius: 0; }
+@media (max-width: 860px) { .force3d { height: 480px; } }

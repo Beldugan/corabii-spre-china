@@ -7,7 +7,7 @@
 <meta name="description" content="Aplicație interactivă pentru copii: cum se conducea o corabie cu pânze, corăbiile reale care au mers în China (în 3D), vânturile și curenții, istoria expedițiilor, simularea călătoriei de la Londra la China, jocuri de navigație și problema zilei.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛵</text></svg>">
 <link rel="stylesheet" href="assets/css/style.css?v=1">
-<link rel="stylesheet" href="assets/css/corabii.css?v=4">
+<link rel="stylesheet" href="assets/css/corabii.css?v=5">
 </head>
 <body>
 
@@ -149,7 +149,7 @@
 
     <div class="panel">
       <h2>1. Corabia văzută din spate, pe vânt</h2>
-      <p class="muted">O corabie ca „Hindostan” (1.200 de tone), tăiată prin mijloc. Mărește vântul și privește ce se întâmplă cu wanturile, catargul și înclinarea. Apoi încearcă furtuna: o dată cu toate pânzele, o dată cu pânzele strânse.</p>
+      <p class="muted">Corabia „Hindostan” (1.200 de tone) din modelul 3D, tăiată prin mijloc și privită din spate. O poți roti puțin cu mouse-ul. Mărește vântul și privește ce se întâmplă cu wanturile, catargul și înclinarea. Apoi încearcă furtuna: o dată cu toate pânzele, o dată cu pânzele strânse.</p>
       <div class="controls">
         <span class="muted">Situații:</span>
         <button class="btn ghost sm" data-scen="port">⚓ În port</button>
@@ -159,13 +159,14 @@
         <button class="btn sm" data-scen="strans">⛈ Furtună cu pânzele strânse</button>
         <button class="btn ghost sm" data-scen="pupa">⬆ Vânt din spate</button>
       </div>
-      <div class="stage"><canvas id="cvForce"></canvas></div>
+      <div class="force3d" id="force3d"><canvas id="cvForceOv" class="ov"></canvas></div>
       <div class="controls">
         <label class="field">Vântul (scara Beaufort) <input type="range" id="fWind" min="0" max="11" value="0"></label>
         <label class="field"><input type="checkbox" id="fWaves"> valuri</label>
         <label class="field"><input type="checkbox" id="fPress" checked> presiunea apei</label>
         <label class="field"><input type="checkbox" id="fExag"> arată îndoirea catargului mărită</label>
         <button class="btn ghost sm" id="fReset">↻ De la capăt</button>
+        <button class="btn ghost sm" id="fView">🎥 Vederea inițială</button>
       </div>
       <div class="controls">
         <span class="muted">Pânzele:</span>
@@ -402,6 +403,6 @@
 
 <footer class="bot">Corăbii spre China · aplicație pentru Eva · Beldu, 2026 · Modelele 3D sunt reconstituiri după desene și descrieri istorice; cifrele sunt aproximative.</footer>
 
-<script src="assets/js/app.js?v=4"></script>
+<script src="assets/js/app.js?v=5"></script>
 </body>
 </html>
