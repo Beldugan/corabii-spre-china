@@ -61,7 +61,7 @@ const INIT = {
     $('#tUnder').addEventListener('change', e => v.setUnderwater(e.target.checked));
     $('#tAuto').addEventListener('change', e => v.setAuto(e.target.checked));
     root.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => v.view(b.dataset.view)));
-    $('#tFull').addEventListener('click', () => { const el = $('#v3d'); (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el); });
+    $('#tFull').addEventListener('click', () => v.toggleFull());
     show('cutty'); v.start();
     root.querySelectorAll('[data-ship] img').forEach(img => getThumb(img.dataset.id).then(u => { if (u) img.src = u; }));
   },

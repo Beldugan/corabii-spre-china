@@ -17,7 +17,14 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
 .viewer { position: relative; width: 100%; height: 520px; border-radius: var(--radius); overflow: hidden; background: #9cc1da; margin-top: 10px; touch-action: none; }
 .viewer.small { height: 440px; }
 .viewer canvas { width: 100% !important; height: 100% !important; }
-.viewer:fullscreen { height: 100vh; border-radius: 0; }
+.viewer:fullscreen, .viewer:-webkit-full-screen { width: 100vw; height: 100vh; border-radius: 0; }
+.viewer.pseudofull { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 1000; border-radius: 0; margin: 0; }
+.vfs { position: absolute; top: 10px; right: 10px; z-index: 5; padding: 8px 13px; border-radius: 10px; border: 0; background: rgba(12,45,72,.85); color: #fff; font: 600 .92rem "Segoe UI", system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.vfs:hover { background: #1b4f72; }
+.viewer.isfull .vfs { top: 14px; right: 14px; font-size: 1rem; }
+.vinfo { position: absolute; left: 14px; bottom: 14px; z-index: 5; max-width: min(460px, 80%); background: rgba(255,255,255,.95); color: #0f172a; border-left: 5px solid #c08a2b; border-radius: 0 12px 12px 0; padding: 10px 34px 10px 14px; font: 1rem/1.45 "Segoe UI", system-ui, sans-serif; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+.vinfo .x { position: absolute; top: 6px; right: 6px; border: 0; background: none; font-size: 1rem; cursor: pointer; color: #334155; }
+.viewer:not(.isfull) .vinfo { display: none; }
 .lbl3d { font: 600 12px "Segoe UI", system-ui, sans-serif; color: #0c2d48; background: rgba(255,255,255,.92); border: 1px solid #c08a2b; border-radius: 999px; padding: 3px 9px; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
 .lbl3d.part { pointer-events: auto; cursor: pointer; }
 .lbl3d.part:hover { background: #fde68a; }

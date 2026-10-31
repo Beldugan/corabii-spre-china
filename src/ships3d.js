@@ -1072,7 +1072,31 @@ export class ShipViewer {
     this.clock = new THREE.Clock(); this.running = false;
     this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(el);
     this.onPart = opts.onPart || (() => {});
+    // butonul de ecran complet + caseta cu explicația piesei (vizibilă și pe ecran complet)
+    const fs = document.createElement('button'); fs.className = 'vfs'; fs.type = 'button'; fs.title = 'Ecran complet'; fs.textContent = '⛶ Ecran complet';
+    fs.addEventListener('click', () => this.toggleFull());
+    el.appendChild(fs); this.fsBtn = fs;
+    const info = document.createElement('div'); info.className = 'vinfo hidden';
+    info.innerHTML = '<button type="button" class="x" title="închide">✕</button><div class="t"></div>';
+    info.querySelector('.x').addEventListener('click', () => info.classList.add('hidden'));
+    el.appendChild(info); this.infoBox = info;
+    const onFs = () => { const on = (document.fullscreenElement || document.webkitFullscreenElement) === el; fs.textContent = on ? '✕ Ieși din ecran complet' : '⛶ Ecran complet'; el.classList.toggle('isfull', on); setTimeout(() => this.resize(), 60); };
+    document.addEventListener('fullscreenchange', onFs); document.addEventListener('webkitfullscreenchange', onFs);
   }
+  toggleFull() {
+    const el = this.el, cur = document.fullscreenElement || document.webkitFullscreenElement;
+    if (cur === el) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else if (el.requestFullscreen) el.requestFullscreen().catch(() => this.fakeFull());
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    else this.fakeFull();
+  }
+  fakeFull() { // pentru iPhone, unde nu există ecran complet: mărim caseta peste toată pagina
+    const on = !this.el.classList.contains('pseudofull');
+    this.el.classList.toggle('pseudofull', on); this.el.classList.toggle('isfull', on);
+    this.fsBtn.textContent = on ? '✕ Ieși din ecran complet' : '⛶ Ecran complet';
+    setTimeout(() => this.resize(), 60);
+  }
+  showInfo(html) { this.infoBox.querySelector('.t').innerHTML = html; this.infoBox.classList.remove('hidden'); }
   resize() {
     const W = this.el.clientWidth, Hh = this.el.clientHeight; if (!W || !Hh) return;
     this.renderer.setSize(W, Hh); this.labelR.setSize(W, Hh);
@@ -1124,7 +1148,7 @@ export class ShipViewer {
     for (const key in a) {
       if (!PARTS[key] || !a[key]) continue;
       const div = document.createElement('button'); div.className = 'lbl3d part'; div.textContent = PARTS[key].ro.replace(/ \(.*/, '');
-      div.addEventListener('click', e => { e.stopPropagation(); this.onPart(key); });
+      div.addEventListener('click', e => { e.stopPropagation(); this.onPart(key); if (this.el.classList.contains('isfull')) this.showInfo(`<b>${PARTS[key].ro}</b><br>${PARTS[key].d}`); });
       const o = new CSS2DObject(div); o.position.copy(a[key]); o.visible = this.showLabels; this.current.add(o); this.labels.push(o);
     }
   }
